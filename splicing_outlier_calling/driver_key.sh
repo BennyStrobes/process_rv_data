@@ -1,5 +1,5 @@
 ####Ben Strober
-####3/28/16
+####2/8/18
 #########These scripts will:
 ##############1. Generate tissue specific junction files using RAIL aligned split reads
 ##############2. Extract rareness of each of our observed junctions using SNAPTRON
@@ -11,48 +11,42 @@
 #Input data
 #############################################################
 #File containing which GTEx samples are to be used for each tissue. Filter list on val(column[27]) == 'RNASEQ'
-sample_attribute_file="/scratch1/battle-fs1/GTEx_Analysis_2016-01-15_v7/sample_annotations/GTEx_Analysis_2016-01-15_v7_SampleAttributesDS.txt"
+sample_attribute_file="/work-zfs/abattle4/lab_data/GTEx_v7/sample_annotations/GTEx_Analysis_2016-01-15_v7_SampleAttributesDS.txt"
 
 #V6 sample attribute file that contains 'flagged samples'
-v6_sample_attribute_file="/scratch0/battle-fs1/GTEx_Analysis_2014-06-13/sample_annotations/GTEx_Data_2014-06-13_Annotations_SampleAttributesDS.txt"
+v6_sample_attribute_file="/work-zfs/abattle4/lab_data/GTEx_v6p/sample_annotations/GTEx_Data_2014-06-13_Annotations_SampleAttributesDS.txt"
 
 #List of gtex tissues. First colum is traditional GTEx tissue name. Second column is GTEx tissue name as listed in $sample_attribute_file
-tissue_list_input_file="/scratch1/battle-fs1/bstrober/rare_variants/rare_splice/outlier_calling/downloaded_data/sr_tissue_converter.txt"
+tissue_list_input_file="/work-zfs/abattle4/lab_data/GTEx_v6p/tissue_names/sr_tissue_converter.txt"
 
 #File that contains all jxns in found in GTEx. Note: it is aligned to hg38 using RAIL.
 #Each row is a jxn and column 11 contains all samples and their corresponding counts of the given junction
 #Downloaded from snaptron data website: "http://snaptron.cs.jhu.edu/data/gtex/junctions.bgz"
-snaptron_gtex_junction_file="/scratch1/battle-fs1/bstrober/rare_variants/rare_splice/outlier_calling/downloaded_data/snaptron_data/gtex_hg38_jxns.bgz"
+snaptron_gtex_junction_file="/work-zfs/abattle4/lab_data/snaptron_data/gtex_hg38_jxns.bgz"
 
 #File that will be used for conversion from SNAPTRON IDs to GTEx sample IDs
 #Downloaded from snaptron website: "http://snaptron.cs.jhu.edu/data/gtex/samles.tsv"
-snaptron_gtex_samples_file="/scratch1/battle-fs1/bstrober/rare_variants/rare_splice/outlier_calling/downloaded_data/snaptron_data/gtex_samples.tsv"
+snaptron_gtex_samples_file="/work-zfs/abattle4/lab_data/snaptron_data/gtex_samples.tsv"
 
-##Contains jxn information from  gtex,srav2, and tcga
-#Must contain files:
-###gtex_hg38_jxns.bgz
-###srav2_hg38_jxns.bgz
-###tcga_hg38_jxns.bgz
-snaptron_directory="/scratch1/battle-fs1/bstrober/rare_variants/rare_splice/outlier_calling/downloaded_data/snaptron_data/"
 
 #Directory that contains Leafcutter code (https://github.com/davidaknowles/leafcutter)
-leafcutter_code_dir="/scratch1/battle-fs1/bstrober/tools/leafcutter/clustering/"
+leafcutter_code_dir="/work-zfs/abattle4/bstrober/tools/leafcutter/clustering/"
 
 #Gencode hg19 gene annotation file
-gencode_hg19_gene_annotation_file="/scratch1/battle-fs1/bstrober/rare_variants/rare_splice/variant_calling/downloaded_data/gencode.v19.annotation.gtf.gz"
+gencode_hg19_gene_annotation_file="/work-zfs/abattle4/lab_data/hg19/gencode_gene_annotations/gencode.v19.annotation.gtf.gz"
 
 #Directory that contains necessary liftover information.
 ##Specifically, it must contain:
 #####1. 'liftOver'   --> the executable
 #####2. 'hg19ToHg38.over.chain.gz'   --> for converting from hg19 to hg38
 #####2. 'hg38ToHg19.over.chain.gz'   --> for converting from hg38 to hg19
-liftover_directory="/scratch1/battle-fs1/bstrober/tools/liftOver_x86/"
+liftover_directory="/work-zfs/abattle4/bstrober/tools/liftOver_x86/"
 
 #File containing TPM scores for all RNA-seq samples in V7 for all genes
 read_counts_tpm_file="/scratch1/battle-fs1/GTEx_Analysis_2016-01-15_v7/rna-seq/GTEx_Analysis_2016-01-15_v7_RSEMv1.2.22_transcript_tpm.txt.gz"
 
 #v6 covariate directory
-covariate_directory_v6="/scratch0/battle-fs1/GTEx_Analysis_2015-01-12/2016_June_08/eqtl/v6p_All_Tissues_covariates_FOR_QC_ONLY/"
+covariate_directory_v6="/work-zfs/abattle4/lab_data/GTEx_v6p/covariates/"
 
 #############################################################
 #Parameters
@@ -85,24 +79,22 @@ filter_global_outlier_method="filter2"
 #############################################################
 #Used Directories (directories need to be created and empty before starting)
 #############################################################
+# Root directories that all other directories will be placed in 
+splicing_output_root="/work-zfs/abattle4/bstrober/rare_variant/rare_splice/process_rv_data/splicing_outlier_calling/"
 #output_dir for pre_process.sh
-pre_process_output_dir="/scratch1/battle-fs1/bstrober/rare_variants/rare_splice/outlier_calling/v2/pre_process/"
+pre_process_output_dir=$splicing_output_root"pre_process/"
 #output_dir for pre_process.sh
-filter_pre_process_output_dir="/scratch1/battle-fs1/bstrober/rare_variants/rare_splice/outlier_calling/v2/filter_pre_process/"
+filter_pre_process_output_dir=$splicing_output_root"filter_pre_process/"
 #output_dir for generate_junctions.sh (contains junction files / sample)
-junctions_output_dir="/scratch1/battle-fs1/bstrober/rare_variants/rare_splice/outlier_calling/v2/junctions/"
+junctions_output_dir=$splicing_output_root"junctions/"
 #Another output_dir for generate_junctions.sh (contains direct output of leafcutter)
-clusters_output_dir="/scratch1/battle-fs1/bstrober/rare_variants/rare_splice/outlier_calling/v2/clusters/"
+clusters_output_dir=$splicing_output_root"clusters/"
 #Another output_dir for generate_junctions.sh (contains filtered versions of leafcutter output)
-clusters_filter_output_dir="/scratch1/battle-fs1/bstrober/rare_variants/rare_splice/outlier_calling/v2/clusters_filter/"
+clusters_filter_output_dir=$splicing_output_root"clusters_filter/"
 #Output_dir for call_outlier_dm.sh
-outlier_calling_dm_output_dir="/scratch1/battle-fs1/bstrober/rare_variants/rare_splice/outlier_calling/v2/outlier_calling_dm/"
+outlier_calling_dm_output_dir=$splicing_output_root"outlier_calling_dm/"
 #In performing outlier calling, we filter samples. This is not possible to do earlier on b/c it requires junction files. The final list of RNA-seq samples used is:
-outlier_calling_samples_dir="/scratch1/battle-fs1/bstrober/rare_variants/rare_splice/outlier_calling/v2/outlier_calling_samples/"
-#output_dir for call_outlier_rare.sh
-outlier_calling_rare_output_dir="/scratch1/battle-fs1/bstrober/rare_variants/rare_splice/outlier_calling/v2/outlier_calling_rare/"
-#output_dir for call_outlier_rare_gtex.sh
-outlier_calling_rare_gtex_output_dir="/scratch1/battle-fs1/bstrober/rare_variants/rare_splice/outlier_calling/v2/outlier_calling_rare_gtex/"
+outlier_calling_samples_dir=$splicing_output_root"outlier_calling_samples/"
 
 #################################################################################################################
 ##################################################################################################################
@@ -191,6 +183,11 @@ all_rna_samples_file_locations=$filter_pre_process_output_dir"/all_rna_samples_f
 #Also, possible for a cluster to not be assigned to any gene (Then that cluster and its corresponding junctions) are removed from downstream
 ##output_saved as *_hg19_filtered_gene_mapped.txt where * is the tissue type. Saved in 'clusters_filter_output_dir'
 ##################################################################################################################
+if false; then
+tissue_type="Adipose_Subcutaneous_Analysis"
+alternative_name="Adipose - Subcutaneous"
+sbatch generate_junctions.sh $tissue_type $filter_pre_process_output_dir $snaptron_gtex_junction_file $snaptron_gtex_samples_file $leafcutter_code_dir $junctions_output_dir $clusters_output_dir $clusters_filter_output_dir $min_reads $liftover_directory $gencode_hg19_gene_annotation_file
+fi
 
 if false; then
 while read tissue_type alternative_name; do
@@ -206,7 +203,7 @@ fi
 
 total_nodes="5"
 
-
+if false; then
 tissue_type="Adipose_Subcutaneous_Analysis"
 node_number="4"
 	covariate_file=$covariate_directory_v6$tissue_type".covariates.txt"
@@ -215,7 +212,7 @@ node_number="4"
 	outlier_calling_samples_file=$outlier_calling_samples_dir$tissue_type"_"$filter_global_outlier_method"_used_samples.txt"
 		tissue_specific_outlier_file=$outlier_calling_dm_output_dir$tissue_type"_"$jxn_filter_method"_"$covariate_regression_method"_"$num_pc"_"$filter_global_outlier_method"_"$node_number
 		sh call_outlier_dm.sh $tissue_type $tissue_specific_jxn_file $tissue_specific_outlier_file $outlier_calling_dm_output_dir $max_dm_junctions $jxn_filter_method $node_number $total_nodes $covariate_regression_method $sample_attribute_file $tissue_list_input_file $covariate_file $rna_seq_samples_file $num_pc $filter_global_outlier_method $v6_sample_attribute_file $outlier_calling_samples_file
- 
+ fi
 
 if false; then
 while read tissue_type; do 
@@ -239,6 +236,33 @@ while read tissue_type; do
 
 done<"/scratch1/battle-fs1/bstrober/rare_variants/rare_splice/outlier_calling/downloaded_data/gtex_tissues.txt"
 fi
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+##################################################################################################################
+#OLD CODE!!! CURRENTLY IGNORE
+##################################################################################################################
+
+#output_dir for call_outlier_rare.sh
+outlier_calling_rare_output_dir="/scratch1/battle-fs1/bstrober/rare_variants/rare_splice/outlier_calling/v2/outlier_calling_rare/"
+#output_dir for call_outlier_rare_gtex.sh
+outlier_calling_rare_gtex_output_dir="/scratch1/battle-fs1/bstrober/rare_variants/rare_splice/outlier_calling/v2/outlier_calling_rare_gtex/"
 
 
 
