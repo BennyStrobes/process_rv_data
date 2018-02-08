@@ -21,6 +21,7 @@ outprefix=$3
 # generate file name from the indincl file name
 keeplist=${indincl%_ids.txt}_VCFids.txt # as above, but IDs as they appear in the snp/indel VCF
 
+
 # get their ids as shown in the vcf file
 zcat $vcf | awk '{if(substr($1,1,2)!="##"){print; exit}}' | \
 awk -v indincl=$indincl 'BEGIN{
@@ -35,8 +36,9 @@ awk -v indincl=$indincl 'BEGIN{
     }
 }' > $keeplist
 
+
 # SNPs
 vcftools --gzvcf $vcf --out ${outprefix}_SNPs --remove-filtered-all --keep $keeplist --remove-indels --max-missing-count 10 --freq &
 vcftools --gzvcf $vcf --out ${outprefix}_SNPs --remove-filtered-all --keep $keeplist --remove-indels --max-missing-count 10 --extract-FORMAT-info GT &
 
-
+wait

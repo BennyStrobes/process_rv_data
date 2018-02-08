@@ -35,6 +35,7 @@ outdir=${dir}/individuals # some future scripts (e.g. CADD one) assume this dire
 
 freq=${VCFPREFIX}_${TYPE}.frq
 gt=${VCFPREFIX}_${TYPE}.GT.FORMAT
+
 # output
 af=${dir}/AF_${TYPE}.bed
 # make sure output directory for individual beds exists
@@ -125,14 +126,6 @@ processgt() {
 	    awk 'BEGIN{OFS="\t"}{if($5>0.25){next}; if($4==1 || $4==$6){print "chr"$1,$2,$3,$5,$4,$7,$8}}' \
 	    > ${outdir}/${sample}_${TYPE}.bed
 
-
-        cat GTEx_Analysis_2016-01-15_v7_WholeGenomeSeq_652Ind_GATK_HaplotypeCaller_446EAonly_SNPs.GT.FORMAT | head -40 | cut -f1,2,3 | skip_header | filter_genotypes | \
-      awk 'BEGIN{OFS="\t"}{print $1,$2-1,$2,$3}' | sort -k1,1 -k2,2n | \
-      bedtools intersect -sorted -wa -wb -a stdin -b af_filer.txt  | \
-      awk 'BEGIN{OFS="\t"}{split($4,geno,"/"); i=10+geno[1]; j=10+geno[2];print $1,$2,$3,$4,$8,$9,$i,$j}' | \
-      clean_genotypes | \
-      awk 'BEGIN{OFS="\t"}{if($5>0.25){next}; if($4==1 || $4==$6){print "chr"$1,$2,$3,$5,$4,$7,$8}}' \
-      > ${outdir}/${sample}_${TYPE}.bed
 	
     else
 	if [ "$TYPE" = "HallLabSV" ]; then

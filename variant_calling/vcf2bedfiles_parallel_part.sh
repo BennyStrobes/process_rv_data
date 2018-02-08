@@ -8,7 +8,7 @@ set -o nounset
 nproc=15
 
 ## takes as input the two vcfs to operate on
-usage="usage: vcf2bedfiles.sh <GTEx SNV/indel vcf> <SV vcf> <job number> <total jobs>"
+usage="usage: vcf2bedfiles.sh <GTEx SNV/indel vcf> <wgs_sample_dir> <job number> <total jobs>"
 if [ $# -ne 4 ]; then
     echo $usage
     exit
@@ -32,6 +32,7 @@ fileprefix=${fileprefix%.vcf.gz}
 fileprefix=${fileprefix}"_"${nEA}"EAonly"
 
 prefix=${wgs_samples_dir}${fileprefix}
+
 
 
 ## actually run things!

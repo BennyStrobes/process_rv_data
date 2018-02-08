@@ -32,15 +32,15 @@ prefix=${wgs_samples_dir}${fileprefix}
 date
 # first get vctools to generate useful information
 echo "Processing VCF files with vcftools..."
+
 #*************************************************************************************************
-bash vcf2bedfiles_helper_processVCF.sh $vcf $indincl $prefix
+sh vcf2bedfiles_helper_processVCF.sh $vcf $indincl $prefix
 echo "Processing VCF files (SNPs/indels) done."
 date
 
 # process SNPs
-echo
 echo "Processing SNPs..."
-bash vcf2bedfiles_helper_processVCFtoolsOutput_serial_part.sh SNPs $prefix
+sh vcf2bedfiles_helper_processVCFtoolsOutput_serial_part.sh SNPs $prefix
 sleep 5 # so they don't both create the outdir at the same time
 
 

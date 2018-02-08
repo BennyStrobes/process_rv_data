@@ -1,5 +1,5 @@
 #!/bin/sh
-#SBATCH --time=10:00:00
+#SBATCH --time=10:00:00 --mem=10GB
 
 tissue_type="$1"
 pre_process_dir="$2"
@@ -12,7 +12,6 @@ clusters_filter_output_dir="$8"
 min_reads="$9"
 liftover_directory="${10}"
 gencode_hg19_gene_annotation_file="${11}"
-
 
 date 
 cwd=`pwd`"/"
@@ -46,9 +45,3 @@ leafcutter_output_file=$clusters_output_dir$tissue_type"_leafcutter_hg38_perind_
 echo "filtering clusters"
 cd $cwd
 python filter_clusters.py $tissue_type $leafcutter_output_file $clusters_filter_output_dir $min_reads $liftover_directory
-#####################################################################################
-#Map Clusters to genes
-#####################################################################################
-echo "mapping clusters to gencode protein coding genes"
-python map_clusters_to_genes.py $tissue_type $clusters_filter_output_dir $gencode_hg19_gene_annotation_file $min_reads
-date

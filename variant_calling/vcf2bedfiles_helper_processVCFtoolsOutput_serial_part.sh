@@ -63,6 +63,8 @@ alias clean_genotypes="sed 's%0/0%0%' | sed 's%[1-9]/0%1%' | sed 's%0/[1-9]%1%' 
 # skips chrom X
 # Doesn't remove X and af=-nan for HallLab SV because there are duplicate entries for the same coordinate and that needs to be dealt with separately
 if [ "$TYPE" = "SNPs" ]; then
+  echo $freq
+  echo $af
     cat $freq | tr ":" "\t" | skip_header | \
 	awk 'BEGIN{OFS="\t"}{
                af=$6;hz=0; 
@@ -73,6 +75,7 @@ if [ "$TYPE" = "SNPs" ]; then
                for(j=NF+1;j<=13;j=j+2){printf "\t."};
                printf "\n"}' | \
 	sort -k1,1 -k2,2n > $af
+
 fi
 if [ "$TYPE" = "indels" ]; then
     cat $freq | tr ":" "\t" | skip_header | \
@@ -120,27 +123,6 @@ processgt() {
 	    clean_genotypes | \
 	    awk 'BEGIN{OFS="\t"}{if($5>0.25){next}; if($4==1 || $4==$6){print "chr"$1,$2,$3,$5,$4,$7,$8}}' \
 	    > ${outdir}/${sample}_${TYPE}.bed
-	
-    else
-	if [ "$TYPE" = "HallLabSV" ]; then
-	    info=${VCFPREFIX}_HallLabSV.INFO
-	    paste <(cut -f1,2,$i $gt) $af $info | skip_header | filter_genotypes | clean_genotypes |
-	    awk 'BEGIN{OFS="\t"}{
-                   if($6>0.25){next};
-                   if($1=="X" || $1=="Y"){next;}
-                   endpos=$12; 
-                   if(endpos=="?"){endpos=$2};
-                   if($3==1 || $3==$7){print "chr"$1,$2-1,endpos,$6,$3}}' | \
-	    sort -k1,1 -k2,2n \
-	    > ${outdir}/${sample}_${TYPE}.bed
-
-	else
-	    cat $gt | cut -f1,2,$i | skip_header | filter_genotypes | clean_genotypes | \
-		awk 'BEGIN{OFS="\t"}{print $1,$2-1,$2,$3}' | sort -k1,1 -k2,2n | \
-		bedtools intersect -sorted -wa -wb -a stdin -b $af | \
-		awk 'BEGIN{OFS="\t"}{if($8>0.25){next}; if($4==1 || $4==$9){print "chr"$1,$2,$3,$8,$4}}' \
-		> ${outdir}/${sample}_${TYPE}.bed
-	fi
     fi
 }
 

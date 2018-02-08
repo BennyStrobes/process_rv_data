@@ -25,7 +25,7 @@ def get_samples_in_snaptron(file_name,v7_samples):
 		if count == 0: #skip header
 			count = count + 1
 			continue
-		rail_sample_id = data[0]
+		rail_sample_id = data[0] 
 		gtex_sample_id = data[7]
 		if gtex_sample_id not in v7_samples:
 			continue
@@ -55,6 +55,7 @@ def print_helper2(snaptron_samples,all_rna_samples_file_locations,filter_pre_pro
 		count = 0
 		for liner in g:
 			liner = liner.rstrip()
+			indi = liner.split('-')[0] + '-' + liner.split('-')[1]
 			if liner in snaptron_samples:
 				count = count + 1
 				t2.write(liner + '\n') 
@@ -66,10 +67,37 @@ def print_helper2(snaptron_samples,all_rna_samples_file_locations,filter_pre_pro
 	f.close()
 
 
+def get_tissues(file_name):
+	f = open(file_name)
+	arr = []
+	for line in f:
+		line = line.rstrip()
+		data = line.split('\t')
+		arr.append(data[0])
+	return arr
+
+
+def get_individuals_used_in_dm_splicing(tissues,dm_outlier_samples_directory):
+	dicti = {}
+	dicti['all_tissues'] = {}
+	for tissue in tissues:
+		input_file = dm_outlier_samples_directory + tissue + '_filter2_used_samples.txt'
+		dicti[tissue] = {}
+		f = open(input_file)
+		for line in f:
+			indi = line.rstrip()
+			dicti[tissue][indi] = 1
+			dicti['all_tissues'][indi] = 1
+		f.close()
+	return dicti
 
 pre_process_output_dir= sys.argv[1]
 snaptron_gtex_samples_file= sys.argv[2]
 filter_pre_process_output_dir = sys.argv[3]
+tissue_list_input_file= sys.argv[4]
+
+
+tissues = get_tissues(tissue_list_input_file)
 
 
 
@@ -78,4 +106,3 @@ v7_samples = get_all_v7_samples(all_rna_samples_file_locations)
 snaptron_samples = get_samples_in_snaptron(snaptron_gtex_samples_file,v7_samples)
 print_helper_indi(snaptron_samples,filter_pre_process_output_dir + 'all_individuals.txt')
 print_helper2(snaptron_samples,all_rna_samples_file_locations,filter_pre_process_output_dir)
-

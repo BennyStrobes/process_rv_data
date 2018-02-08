@@ -1,5 +1,5 @@
 ####Ben Strober
-####2/8/18
+####3/28/16
 #########These scripts will:
 ##############1. Generate tissue specific junction files using RAIL aligned split reads
 ##############2. Extract rareness of each of our observed junctions using SNAPTRON
@@ -47,6 +47,7 @@ read_counts_tpm_file="/scratch1/battle-fs1/GTEx_Analysis_2016-01-15_v7/rna-seq/G
 
 #v6 covariate directory
 covariate_directory_v6="/work-zfs/abattle4/lab_data/GTEx_v6p/covariates/"
+
 
 #############################################################
 #Parameters
@@ -96,7 +97,17 @@ outlier_calling_dm_output_dir=$splicing_output_root"outlier_calling_dm/"
 #In performing outlier calling, we filter samples. This is not possible to do earlier on b/c it requires junction files. The final list of RNA-seq samples used is:
 outlier_calling_samples_dir=$splicing_output_root"outlier_calling_samples/"
 
+
+
+
+
+
+
+
+
+
 #################################################################################################################
+#JXN PREPERATION
 ##################################################################################################################
 #pre_process.sh produces lists of what gtex samples will be used in which tissue
 #Output files made (all we be written in pre_process_output_dir)
@@ -132,7 +143,7 @@ all_rna_samples_file_locations=$pre_process_output_dir"/all_rna_samples_file_loc
 #Spot checked
 ###################################################################################################################
 if false; then
-sh filter_pre_process.sh $pre_process_output_dir $snaptron_gtex_samples_file $filter_pre_process_output_dir
+sh filter_pre_process.sh $pre_process_output_dir $snaptron_gtex_samples_file $filter_pre_process_output_dir $tissue_list_input_file
 fi
 
 #A file generated from filter_pre_process.sh.
@@ -175,118 +186,100 @@ all_rna_samples_file_locations=$filter_pre_process_output_dir"/all_rna_samples_f
 ##As some jxns are not 'liftoverable', a small fraction of jxns don't map. 
 #Therefor, remove jxns that belong to a cluster with only 1 junction.
 ##output saved as *_hg19_filtered.txt where * is tissue type. Saved in 'clusters_filter_output_dir'
-###########################################
-##Subpart_4: 'map_clusters_to_genes.py '
-#This script takes that output from subpart_e (*_hg19_filtered_&_reads.txt) and maps clusters to hg19 protein coding genes
-#ie, a cluster is assigned to a gene if one of the cluster's jxns falls within the gencode 'gene' position for that gene
-#Ie, it is very possible for 1 cluster to be assigned to more than one gene
-#Also, possible for a cluster to not be assigned to any gene (Then that cluster and its corresponding junctions) are removed from downstream
-##output_saved as *_hg19_filtered_gene_mapped.txt where * is the tissue type. Saved in 'clusters_filter_output_dir'
 ##################################################################################################################
-if false; then
 tissue_type="Adipose_Subcutaneous_Analysis"
 alternative_name="Adipose - Subcutaneous"
 sbatch generate_junctions.sh $tissue_type $filter_pre_process_output_dir $snaptron_gtex_junction_file $snaptron_gtex_samples_file $leafcutter_code_dir $junctions_output_dir $clusters_output_dir $clusters_filter_output_dir $min_reads $liftover_directory $gencode_hg19_gene_annotation_file
-fi
 
 if false; then
 while read tissue_type alternative_name; do
 	sbatch generate_junctions.sh $tissue_type $filter_pre_process_output_dir $snaptron_gtex_junction_file $snaptron_gtex_samples_file $leafcutter_code_dir $junctions_output_dir $clusters_output_dir $clusters_filter_output_dir $min_reads $liftover_directory $gencode_hg19_gene_annotation_file
 done<$tissue_list_input_file
+
+##################################################################################################################
+#generate_junctions_cross_tissues.sh performs the final steps of junction file generation that must be done by taking all tissues into account (as we want clusters to be the same across tissues)
+#As such, this script has multiple subparts:
+##########################
+##Subpart_1: generate_cross_tissue_clusters.py
+#####This section creates leafcutter clusters ACROSS TISSUES based on our filtered junctions.
+#####It will remove junctions to belong to clusters with only one junction (It will do this in a tissue specific and global manner. So really only tissue specific)
+#####It will output a file of the form $clusters_filter_output_dir$tissue_type"_hg19_filtered_xt_reclustered.txt"
+##Subpart_2: map_clusters_to_genes_cross_tissues.py
+#####This section will map a cluster to a given gencode v19 protein coding gene
+#####A cluster is mapped to a gene if one of its junctions lies within the gene body
+#####We will filter out clusters that are not mapped to any genes
+#####It will output a file of the form $clusters_filter_output_dir$tissue_type"_hg19_filtered_xt_reclustered_gene_mapped.txt"
+#####It will also output a file of the form $clusters_filter_output_dir"cluster_info.txt"
+
+
+
+sh generate_cross_tissue_clusters.sh $tissue_list_input_file $clusters_filter_output_dir $gencode_hg19_gene_annotation_file
 fi
 
-##################################################################################################################
-##################################################################################################################
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+#################################################################################################################
+#DM OUTLIER CALLING
+##################################################################################################################
 
 
 total_nodes="5"
-
 if false; then
 tissue_type="Adipose_Subcutaneous_Analysis"
 node_number="4"
-	covariate_file=$covariate_directory_v6$tissue_type".covariates.txt"
-	tissue_specific_jxn_file=$clusters_filter_output_dir$tissue_type"_hg19_filtered_gene_mapped.txt"
-	rna_seq_samples_file=$filter_pre_process_output_dir$tissue_type"_rnaseq_sample_ids.txt"
-	outlier_calling_samples_file=$outlier_calling_samples_dir$tissue_type"_"$filter_global_outlier_method"_used_samples.txt"
-		tissue_specific_outlier_file=$outlier_calling_dm_output_dir$tissue_type"_"$jxn_filter_method"_"$covariate_regression_method"_"$num_pc"_"$filter_global_outlier_method"_"$node_number
-		sh call_outlier_dm.sh $tissue_type $tissue_specific_jxn_file $tissue_specific_outlier_file $outlier_calling_dm_output_dir $max_dm_junctions $jxn_filter_method $node_number $total_nodes $covariate_regression_method $sample_attribute_file $tissue_list_input_file $covariate_file $rna_seq_samples_file $num_pc $filter_global_outlier_method $v6_sample_attribute_file $outlier_calling_samples_file
- fi
-
+covariate_file=$covariate_directory_v6$tissue_type".covariates.txt"
+tissue_specific_jxn_file=$clusters_filter_output_dir$tissue_type"_hg19_filtered_xt_reclustered_gene_mapped.txt"
+rna_seq_samples_file=$filter_pre_process_output_dir$tissue_type"_rnaseq_sample_ids.txt"
+outlier_calling_samples_file=$outlier_calling_samples_dir$tissue_type"_"$filter_global_outlier_method"_used_samples.txt"
+tissue_specific_outlier_file=$outlier_calling_dm_output_dir$tissue_type"_"$jxn_filter_method"_"$covariate_regression_method"_"$num_pc"_"$filter_global_outlier_method"_"$node_number
+sh call_outlier_dm.sh $tissue_type $tissue_specific_jxn_file $tissue_specific_outlier_file $outlier_calling_dm_output_dir $max_dm_junctions $jxn_filter_method $node_number $total_nodes $covariate_regression_method $sample_attribute_file $tissue_list_input_file $covariate_file $rna_seq_samples_file $num_pc $filter_global_outlier_method $v6_sample_attribute_file $outlier_calling_samples_file
+fi
 if false; then
 while read tissue_type; do 
 
 	covariate_file=$covariate_directory_v6$tissue_type".covariates.txt"
-	tissue_specific_jxn_file=$clusters_filter_output_dir$tissue_type"_hg19_filtered_gene_mapped.txt"
+
+	tissue_specific_jxn_file=$clusters_filter_output_dir$tissue_type"_hg19_filtered_xt_reclustered_gene_mapped.txt"
+
 	rna_seq_samples_file=$filter_pre_process_output_dir$tissue_type"_rnaseq_sample_ids.txt"
+
 	outlier_calling_samples_file=$outlier_calling_samples_dir$tissue_type"_"$filter_global_outlier_method"_used_samples.txt"
+
 
 	for node_number in $(seq 0 `expr $total_nodes - "1"`); do
 		tissue_specific_outlier_file=$outlier_calling_dm_output_dir$tissue_type"_"$jxn_filter_method"_"$covariate_regression_method"_"$num_pc"_"$filter_global_outlier_method"_"$node_number
-		if false; then
+		echo $node_number		
 		sbatch call_outlier_dm.sh $tissue_type $tissue_specific_jxn_file $tissue_specific_outlier_file $outlier_calling_dm_output_dir $max_dm_junctions $jxn_filter_method $node_number $total_nodes $covariate_regression_method $sample_attribute_file $tissue_list_input_file $covariate_file $rna_seq_samples_file $num_pc $filter_global_outlier_method $v6_sample_attribute_file $outlier_calling_samples_file
-		fi
+
 	done
+
 	echo $tissue_type
-	cat $outlier_calling_dm_output_dir$tissue_type"_"$jxn_filter_method"_"$covariate_regression_method"_"$num_pc"_"$filter_global_outlier_method"_"*"_pvalue.txt" > $outlier_calling_dm_output_dir$tissue_type"_"$jxn_filter_method"_"$covariate_regression_method"_"$num_pc"_"$filter_global_outlier_method"_pvalue.txt"
 
-	cat $outlier_calling_dm_output_dir$tissue_type"_"$jxn_filter_method"_"$covariate_regression_method"_"$num_pc"_"$filter_global_outlier_method"_"*"_md.txt" > $outlier_calling_dm_output_dir$tissue_type"_"$jxn_filter_method"_"$covariate_regression_method"_"$num_pc"_"$filter_global_outlier_method"_md.txt"
 
+done<"/scratch1/battle-fs1/bstrober/rare_variants/rare_splice/outlier_calling/downloaded_data/gtex_tissues_10_1.txt"
+fi
+if false; then
+while read tissue_type; do 
+	echo $tissue_type
+	tissue_specific_outlier_root=$outlier_calling_dm_output_dir$tissue_type"_"$jxn_filter_method"_"$covariate_regression_method"_"$num_pc"_"$filter_global_outlier_method"_"
+	tissue_specific_jxn_file=$clusters_filter_output_dir$tissue_type"_hg19_filtered_xt_reclustered_gene_mapped.txt"
+
+
+	sh merge_outlier_calling_results.sh $tissue_type $total_nodes $tissue_specific_outlier_root $tissue_specific_jxn_file
 
 done<"/scratch1/battle-fs1/bstrober/rare_variants/rare_splice/outlier_calling/downloaded_data/gtex_tissues.txt"
+
 fi
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-##################################################################################################################
-#OLD CODE!!! CURRENTLY IGNORE
-##################################################################################################################
-
-#output_dir for call_outlier_rare.sh
-outlier_calling_rare_output_dir="/scratch1/battle-fs1/bstrober/rare_variants/rare_splice/outlier_calling/v2/outlier_calling_rare/"
-#output_dir for call_outlier_rare_gtex.sh
-outlier_calling_rare_gtex_output_dir="/scratch1/battle-fs1/bstrober/rare_variants/rare_splice/outlier_calling/v2/outlier_calling_rare_gtex/"
-
-
-
-##################################################################################################################
-#recount rareness calling
-##################################################################################################################
-
-if false; then
-while read tissue_type alternative_name; do
-
-tissue_specific_jxn_file=$clusters_filter_output_dir$tissue_type"_hg38_filtered_"$min_reads"_reads.txt"
-tissue_specific_rare_outlier_file_root=$outlier_calling_rare_output_dir$tissue_type"_"
-sbatch call_outlier_rare.sh $tissue_type $tissue_specific_jxn_file $tissue_specific_rare_outlier_file_root $snaptron_directory $liftover_directory $outlier_calling_rare_output_dir
-
-done<$tissue_list_input_file
-fi
-
-
-##################################################################################################################
-#gtex rareness calling
-##################################################################################################################
-if false; then
-sbatch call_outlier_rare_gtex_shell.sh $tissue_list_input_file $clusters_filter_output_dir $min_reads $outlier_calling_rare_gtex_output_dir
-fi
-
-
 

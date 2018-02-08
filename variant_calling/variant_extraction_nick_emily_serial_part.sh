@@ -10,4 +10,4 @@ wgs_samples_dir="$4"
 #****************************************
 python filter_subjects.py $subject_phenotype_file $rna_seq_individuals $wgs_samples_dir"EA_gtex_ids.txt"
 
-bash vcf2bedfiles_serial_part.sh $vcf_file $wgs_samples_dir
+sh vcf2bedfiles_serial_part.sh $vcf_file $wgs_samples_dir

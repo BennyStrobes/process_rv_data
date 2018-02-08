@@ -55,13 +55,13 @@ gene_mapping_method="method_1"
 #See https://github.com/joed3/GTExV6PRareVariation for reference on their code
 total_jobs="80"
 
-if false; then
-sh variant_extraction_nick_emily_serial_part.sh $vcf_file $subject_phenotype_file $rna_seq_individuals $wgs_samples_dir
-fi
+sbatch variant_extraction_nick_emily_serial_part.sh $vcf_file $subject_phenotype_file $rna_seq_individuals $wgs_samples_dir
+
 
 job_number="0"
+if false; then
 sbatch variant_extraction_nick_emily_parallel_part.sh $vcf_file $wgs_samples_dir $job_number $total_jobs
-
+fi
 if false; then
 for job_number in $(seq 1 `expr $total_jobs - "1"`); do
 	echo $job_number
