@@ -19,7 +19,7 @@ def add_jxn_to_gene_jxn_data_structure(gene_jxn_data_structure,gene,jxn_read_cou
 
 #Extract mapping from gene to NXK jxn matrix. 
 #Also extract ordered array of samples corresponding to max possible samples
-def extract_raw_gene_jxn_data_strucutre(tissue_specific_jxn_file,used_samples):
+def extract_raw_gene_jxn_data_strucutre(tissue_specific_jxn_file):
     f = open(tissue_specific_jxn_file)
     count =0
     gene_jxn_data_structure = {}
@@ -37,9 +37,8 @@ def extract_raw_gene_jxn_data_strucutre(tissue_specific_jxn_file,used_samples):
             indices = []
             #filter temp_samples based on used_samples
             for i,val in enumerate(temp_samples):
-                if val in used_samples:
-                    samples.append(val)
-                    indices.append(i)
+                samples.append(val)
+                indices.append(i)
             if np.array_equal(np.asarray(temp_samples)[indices],np.asarray(samples)) == False:
                 print('erororor')
             
@@ -415,13 +414,34 @@ def add_covariates_to_gene_junction_data_structure_v6p_eqtl_covariates_version(g
         gene_jxn_data_structure[gene]['covariate_matrix'] = covariate_matrix[indices,:]
     return gene_jxn_data_structure
 
+def add_covariates_to_gene_jxn_data_structure_general(gene_jxn_data_structure, samples, covariate_file):
+    covariate_matrix = np.transpose(np.loadtxt(covariate_file, dtype=str)[1:,1:].astype(float))
+    #standardize matrix
+    covariate_matrix = standardize_matrix(covariate_matrix)
+    #Loop through relevent genes
+    for gene in gene_jxn_data_structure.keys():
+        #Extract array of samples defined for this gene
+        gene_samples = gene_jxn_data_structure[gene]['samples']
+        #create mapping (indices) from full samples array (samples) to gene specific samples array (gene_samples)
+        indices = []
+        for i,sample in enumerate(samples):
+            if sample in gene_samples:
+                indices.append(i)
+        #check to make sure I performed mapping correctly
+        if np.array_equal(samples[indices],gene_samples) == False:
+            print('eororoorororrororo')
+            pdb.set_trace()
+        #Add to gene_jxn_data_structure
+        gene_jxn_data_structure[gene]['covariate_matrix'] = covariate_matrix[indices,:]
+    return gene_jxn_data_structure
 
 #Add covariate matrix to gene_jxn_data_structure. Key is called 'covariate_matrix'
-def add_covariates_to_gene_junction_data_structure(gene_jxn_data_structure,samples,covariate_regression_method,v6p_covariate_file,num_pc):
+def add_covariates_to_gene_junction_data_structure(gene_jxn_data_structure,samples,covariate_regression_method,covariate_file):
     #Select which version of covariates we wish to use
-    if covariate_regression_method == 'v6p_eqtl_covariates':
+    if covariate_regression_method != 'none':
         #v6p_eqtl_covariates uses all covariates (except only first num_pc) of the gtex v6p eqtl covariates
-         gene_jxn_data_structure = add_covariates_to_gene_junction_data_structure_v6p_eqtl_covariates_version(gene_jxn_data_structure,samples,v6p_covariate_file,num_pc)
+        #gene_jxn_data_structure = add_covariates_to_gene_junction_data_structure_v6p_eqtl_covariates_version(gene_jxn_data_structure,samples,v6p_covariate_file,num_pc)
+        gene_jxn_data_structure = add_covariates_to_gene_jxn_data_structure_general(gene_jxn_data_structure, samples, covariate_file)
     return gene_jxn_data_structure
 
 #Convert jxn file into a gene based data structure.
@@ -434,24 +454,19 @@ def add_covariates_to_gene_junction_data_structure(gene_jxn_data_structure,sampl
 
 #@Return: gene_jxn_data_structure
 #@RETURN: samples --> ordered array of individual ids corresponding to all samples that passed sample specific filters. 
-def create_gene_based_data_structure(tissue_specific_jxn_file,max_dm_junctions,jxn_filter_method,min_reads_per_individual,min_individuals_per_gene,filter_global_outlier_method,v6_sample_attribute_file,outlier_calling_samples_file,sample_attribute_file_tissue_type,v6p_covariate_file,num_pc,covariate_regression_method,node_number):
-    #This first part we are going to extract the samples we will use in our outlier calling analysis based off of filter_global_outlier_method
-    #we will also write these samples to outlier_calling_samples_file
-    samples_dicti = filter_samples(tissue_specific_jxn_file,filter_global_outlier_method,v6_sample_attribute_file,outlier_calling_samples_file,sample_attribute_file_tissue_type,v6p_covariate_file,node_number)
+def create_gene_based_data_structure(tissue_specific_jxn_file, max_dm_junctions, jxn_filter_method, min_reads_per_individual, min_individuals_per_gene, outlier_calling_samples_file, covariate_file, covariate_regression_method, node_number):   
 
-
-
-    #Get raw data structure 
+    #Get raw data structure
     #Also get samples, this is the maximum possible samples after filtering
-    gene_jxn_data_structure,samples = extract_raw_gene_jxn_data_strucutre(tissue_specific_jxn_file,samples_dicti)
+    gene_jxn_data_structure, samples = extract_raw_gene_jxn_data_strucutre(tissue_specific_jxn_file)
 
     #apply max_junction_filter
-    gene_jxn_data_structure = max_number_of_jxns_filter(gene_jxn_data_structure,max_dm_junctions,jxn_filter_method)
+    gene_jxn_data_structure = max_number_of_jxns_filter(gene_jxn_data_structure, max_dm_junctions, jxn_filter_method)
     #Apply min_reads_per_individual filter
-    gene_jxn_data_structure = min_reads_per_individual_filter(gene_jxn_data_structure,min_reads_per_individual,min_individuals_per_gene)
+    gene_jxn_data_structure = min_reads_per_individual_filter(gene_jxn_data_structure, min_reads_per_individual, min_individuals_per_gene)
 
     #Add covariate matrix to gene_jxn_data_structure. Key is called 'covariate_matrix'
-    gene_jxn_data_structure = add_covariates_to_gene_junction_data_structure(gene_jxn_data_structure,samples,covariate_regression_method,v6p_covariate_file,num_pc)
+    gene_jxn_data_structure = add_covariates_to_gene_junction_data_structure(gene_jxn_data_structure, samples, covariate_regression_method, covariate_file)
 
 
     return gene_jxn_data_structure,samples
@@ -621,6 +636,21 @@ def mahalanobis_distance(x,alpha):
         pdb.set_trace()
     return np.sqrt(distance)
 
+#Compute mahalanobis distance for one sample
+def mahalanobis_distance_computer(x,alpha):
+    n = np.sum(x)
+    alpha_0 = np.sum(alpha)
+    cov = compute_dm_covariance_matrix(n,alpha)
+    mu = n*alpha/alpha_0
+    diff_mat = np.asmatrix(x-mu)
+    p_inv_cov = np.linalg.pinv(cov)
+    distance = np.dot(np.dot(diff_mat,p_inv_cov),np.transpose(diff_mat))[0,0]
+    error_term = False
+    if distance < 0:
+        print('ERROR: Mahalanobis distance is less than zero')
+        error_term = True
+    return np.sqrt(distance), error_term
+
 #Compute mahalanobis distance for each sample. Return array of len == num_samples
 def get_mahala_disty_shell(alpha,X):
     N,k = X.shape
@@ -640,15 +670,57 @@ def sample(alpha,num_samples,N_count):
     return np.squeeze(np.asarray(distances))
 
 def adaptive_sample(alpha,N_count,max_observed_distance):
-    num_samples = 10000
-    sample_distances = sample(alpha,num_samples,N_count)
+    num_samples = 1000
+    sample_distances = sample(alpha, num_samples, N_count)
     if max(sample_distances) < max_observed_distance:
-        num_samples = 100000
+        num_samples = 10000
         sample_distances = sample(alpha,num_samples,N_count)
+        if max(sample_distances) < max_observed_distance:
+            num_samples = 100000
+            sample_distances = sample(alpha,num_samples,N_count)
         #if max(sample_distances) < max_observed_distance:
             #num_samples = 1000000
             #sample_distances = sample(alpha,num_samples,N_count)
     return sample_distances
+
+def sample_glm(alpha, num_samples, N_count, mu, inv_cov):
+    distyz = []
+    sample_alphas = np.random.dirichlet(alpha,size=num_samples)
+    x = []
+    for i in range(num_samples):
+        x.append(np.random.multinomial(N_count,sample_alphas[i,:]))
+    x = np.asmatrix(x)
+    if num_samples <= 1000:  # If number of samples is 1000 or less, do not split up the matrix
+        diff_mat = x-mu
+        distances = np.diag(np.dot(np.dot(diff_mat, inv_cov),np.transpose(diff_mat)))
+    else:  # if number of samples is > 1000, split up the matrix into 10 splits (for memory reasons)
+        x_split = np.split(x,10)  # Create list of split matrices
+        distances = []
+        for split_iter in range(len(x_split)):  # For each split matrix, compute the mahalanobis distances
+            x_iter = x_split[split_iter]  # The split matrix
+            diff_mat = x_iter - mu
+            distances.append(np.diag(np.dot(np.dot(diff_mat, inv_cov),np.transpose(diff_mat))))
+        distances = np.hstack(distances)
+    return distances
+
+
+def adaptive_sample_glm(alpha, md):
+    N_count = 20000
+    alpha_0 = np.sum(alpha)
+    cov = compute_dm_covariance_matrix(N_count, alpha)
+    mu = N_count*alpha/alpha_0
+    inv_cov = np.linalg.pinv(cov)
+
+    num_samples = 1000
+    sample_distances = sample_glm(alpha, num_samples, N_count, mu, inv_cov)
+    if max(sample_distances) < md:
+        num_samples = 10000
+        sample_distances = sample_glm(alpha, num_samples, N_count, mu, inv_cov)
+        if max(sample_distances) < md:
+            num_samples = 100000
+            sample_distances = sample_glm(alpha, num_samples, N_count, mu, inv_cov)
+    pval = len(np.where(md <= sample_distances)[0])/float(len(sample_distances))
+    return pval
 
 #Take num_draws for the fitted DM. For each draw, compute mahalanobis distance
 def sample_rand(alpha,num_samples,counts):
@@ -699,17 +771,35 @@ def outlier_analysis_dm(X,samples):
             pdb.set_trace()
         pvalz.append(pval)
 
-    log_sample_dist = np.log(sample_distances)
-    md_distribution_paramz=ss.genlogistic.fit(log_sample_dist)
-    md_distribution = ss.genlogistic(md_distribution_paramz[0],md_distribution_paramz[1],md_distribution_paramz[2])
-    log_distances = np.log(distances)
-    parametric_pvalues = 1 - md_distribution.cdf(log_distances)
 
 
 
 
 
-    return distances,pvalz,alpha,parametric_pvalues
+    return distances,pvalz,alpha
+
+def outlier_analysis_dm_glm(X, alpha_matrix):
+    N1,K1 = X.shape
+    N2,K2 = alpha_matrix.shape
+    N = N1
+    if N1 != N2 or K1 != K2:  # make sure shape of X and alpha are the same
+        print('Shape mismatch erroror!!')
+        pdb.set_trace()
+    read_counts = np.squeeze(np.asarray(np.sum(X,axis=1)))  # Compute n (sum(x_i)) for each sample
+    distances = []  # Keep track of raw mahalanobis distance for each sample
+    pvalues = []  # Keep track of pvalues for each sample
+    error = False
+    for n in range(N):  # Loop through the samples
+        alpha_n = np.squeeze(np.asarray(alpha_matrix[n,:]))  # alpha for this sample
+        md_n, error_term = mahalanobis_distance_computer(X[n,:],alpha_n)
+        if error_term == True:
+            return distances, pvalues, True
+        distances.append(md_n)
+        pvalue_n = adaptive_sample_glm(alpha_n, md_n)
+        pvalues.append(pvalue_n)
+    return distances, pvalues, error 
+
+
 
 ###################################################################################################################################################
 #Regress out effects of covariates using Direchlet multinomial GLM 
@@ -852,16 +942,14 @@ def outlier_calling_print_helper(arr,samples,all_samples,t,gene):
 
 #call outliers for each gene using a fitted dirichlet multinomial
 #Also write to output
-def call_outliers_with_dirichlet_multinomial(tissue_specific_outlier_file_root,gene_jxn_data_structure,all_samples,start_number,end_number):
+def call_outliers_with_dirichlet_multinomial(tissue_specific_outlier_file_root,gene_jxn_data_structure,all_samples,start_number,end_number,covariate_regression_method, lam):
 
     #Initialize output files
     t_MD = open(tissue_specific_outlier_file_root + '_md.txt','w')#file handle for matrix of mahalnobis distances
     t_pvalue = open(tissue_specific_outlier_file_root + '_emperical_pvalue.txt','w') #file handle for matrix of pvalues 
-    t_pvalue2 = open(tissue_specific_outlier_file_root + '_parametric_pvalue.txt','w') #file handle for matrix of pvalues 
     #Write headers for output files
     t_MD.write('CLUSTER_ID\t' + '\t'.join(all_samples) + '\n')
     t_pvalue.write('CLUSTER_ID\t' + '\t'.join(all_samples) + '\n')
-    t_pvalue2.write('CLUSTER_ID\t' + '\t'.join(all_samples) + '\n')
 
 
 
@@ -884,31 +972,43 @@ def call_outliers_with_dirichlet_multinomial(tissue_specific_outlier_file_root,g
         ####################################################################
         #Actual analysis
         ####################################################################
-        #Extract jxn matrix for gene
-        X = gene_jxn_data_structure[gene]['jxn_matrix']
-        #Extract genes samples
-        samples = gene_jxn_data_structure[gene]['samples']
-        #Exctract covariance matrix
-        cov_mat = gene_jxn_data_structure[gene]['covariate_matrix']
+        try:
+            #Extract jxn matrix for gene
+            X = gene_jxn_data_structure[gene]['jxn_matrix']
+            #Extract genes samples
+            samples = gene_jxn_data_structure[gene]['samples']
+            #Exctract covariance matrix
+            if covariate_regression_method.startswith('junction_pc_no_regress') == False:
+                if covariate_regression_method != 'none':
+                    cov_mat = gene_jxn_data_structure[gene]['covariate_matrix']
 
-        N1,K = cov_mat.shape
-        N2,J = X.shape
-        #simple error checking
-        if N1 != N2:
-            print('erororoororor')
+                    N1,K = cov_mat.shape
+                    N2,J = X.shape
+                    #simple error checking
+                    if N1 != N2:
+                        print('erororoororor')
 
-        #Regress out effects of covariates
-        X = dm_glm.regress_covariates_with_dm_glm(X,np.hstack((np.ones((N1,1)),cov_mat)))
+                    #Regress out effects of covariates
+                    X = dm_glm.regress_covariates_with_dm_glm(X,np.hstack((np.ones((N1,1)),cov_mat)))
 
-        #Run outlier analysis
-        distances,pvalz,alpha,parametric_pvalues = outlier_analysis_dm(X,samples)
-        
-        #print Mahalanobis distance results to output file
-        t_MD = outlier_calling_print_helper(distances,samples,all_samples,t_MD,gene)
-        #print emperical pvalu results to output file
-        t_pvalue = outlier_calling_print_helper(pvalz,samples,all_samples,t_pvalue,gene)
+                #Run outlier analysis
+                distances,pvalz,alpha = outlier_analysis_dm(X,samples)
+            elif covariate_regression_method.startswith('junction_pc_no_regress'):
+                cov_mat = gene_jxn_data_structure[gene]['covariate_matrix']
+                N1,K = cov_mat.shape
+                N2,J = X.shape
+                alpha_matrix, beta_mat, conc_vec = dm_glm.dirichlet_multinomial_glm_fit(X,np.hstack((np.ones((N1,1)),cov_mat)), lam)
+                distances, pvalz, error = outlier_analysis_dm_glm(X, alpha_matrix)
+            if error == False:
+                #print Mahalanobis distance results to output file
+                t_MD = outlier_calling_print_helper(distances,samples,all_samples,t_MD,gene)
+                #print emperical pvalu results to output file
+                t_pvalue = outlier_calling_print_helper(pvalz,samples,all_samples,t_pvalue,gene)
+            else:
+                print('ERROR in running ' + gene)
 
-        t_pvalue2 = outlier_calling_print_helper(parametric_pvalues,samples,all_samples,t_pvalue2,gene)
+        except:
+            print('ERROR in running ' + gene)
 
 
 
@@ -938,7 +1038,7 @@ def parallelization_start_and_end(total,node_number,total_nodes):
     gene_end = (node_number + 1)*genes_per_node -1
     return gene_start,gene_end
 
-def call_outliers(tissue_type,tissue_specific_jxn_file,tissue_specific_outlier_file,outlier_calling_dm_output_dir,max_dm_junctions,jxn_filter_method,node_number,total_nodes,covariate_regression_method,sample_attribute_file,sample_attribute_file_tissue_type,v6p_covariate_file,rna_seq_samples_file,num_pc,filter_global_outlier_method,v6_sample_attribute_file,outlier_calling_samples_file):
+def call_outliers(tissue_type, tissue_specific_jxn_file, tissue_specific_outlier_file, outlier_calling_dm_output_dir, max_dm_junctions, jxn_filter_method, node_number, total_nodes, covariate_regression_method, covariate_file, rna_seq_samples_file, num_pc, outlier_calling_samples_file, lam):
     min_reads_per_individual= 5
     min_individuals_per_gene=50
     #Convert jxn file into a gene based data structure.
@@ -947,7 +1047,7 @@ def call_outliers(tissue_type,tissue_specific_jxn_file,tissue_specific_outlier_f
     ####1. Limit K to be at max: max_dm_junctions. Implement this filtering by jxn_filter_method
     ####2. At the gene level, require an individuals to have at least $min_reads_per_individual.
     ########Following up on filter 2, if there are less than $min_individuals_per_gene, discard gene
-    gene_jxn_data_structure,all_samples = create_gene_based_data_structure(tissue_specific_jxn_file,max_dm_junctions,jxn_filter_method,min_reads_per_individual,min_individuals_per_gene,filter_global_outlier_method,v6_sample_attribute_file,outlier_calling_samples_file,sample_attribute_file_tissue_type,v6p_covariate_file,num_pc,covariate_regression_method,node_number)
+    gene_jxn_data_structure, all_samples = create_gene_based_data_structure(tissue_specific_jxn_file, max_dm_junctions, jxn_filter_method, min_reads_per_individual, min_individuals_per_gene, outlier_calling_samples_file, covariate_file, covariate_regression_method, node_number)
     
 
 
@@ -960,7 +1060,7 @@ def call_outliers(tissue_type,tissue_specific_jxn_file,tissue_specific_outlier_f
     start_number,end_number = parallelization_start_and_end(len(gene_jxn_data_structure),node_number,total_nodes)
     #call outliers for each gene using a fitted dirichlet multinomial
     #Also write to output
-    call_outliers_with_dirichlet_multinomial(tissue_specific_outlier_file,gene_jxn_data_structure,all_samples,start_number,end_number)
+    call_outliers_with_dirichlet_multinomial(tissue_specific_outlier_file,gene_jxn_data_structure,all_samples,start_number,end_number, covariate_regression_method, lam)
 
 #tissue types in sample attribute file are spelled differently than 'traditional'. This provides a conversion between the two
 def get_sample_attribute_tissue_type(tissue_list_input_file,tissue_type):
@@ -984,7 +1084,7 @@ max_dm_junctions = float(sys.argv[5]) #Maximum number of jxns we will allow a ge
 #Method to select max_dm_junctions.Current methods include:
 ###1. extreme_junctions: Take max_dm_junctions/2 that have the highest read count and take the max_dm_junctions/2 that have the smallest read counts.
 ###2. ignore_genes: Disregard genes that have more than $max_dm_junctions
-jxn_filter_method = sys.argv[6] 
+jxn_filter_method = sys.argv[6]
 ##############################
 #For parallelization purposes
 node_number = int(sys.argv[7])
@@ -992,27 +1092,21 @@ total_nodes = int(sys.argv[8])
 ##############################
 #How to deal with covariates
 covariate_regression_method= sys.argv[9]
-#Contains covariate information for GTEx v7 RNA seq samples
-sample_attribute_file = sys.argv[10]
-#contains list of all tissue names in traditional spelling as well as how the tissues are spelled int he sample_attribute file
-tissue_list_input_file = sys.argv[11]
 
-#GTEx_v6p covariate file
-v6p_covariate_file = sys.argv[12]
+
+# covariate file
+covariate_file = sys.argv[10]
 
 #all rna-seq sample ids used in this tissue
-rna_seq_samples_file = sys.argv[13]
+rna_seq_samples_file = sys.argv[11]
 #Number of principle components to use. Only applicable if covariate_regression_method includes pcs
-num_pc = int(sys.argv[14])
+num_pc = int(sys.argv[12])
 
-#method used to filter global outlier samples
-filter_global_outlier_method = sys.argv[15]
-v6_sample_attribute_file = sys.argv[16]
+
 #output file to write actual samples used in this analysis
-outlier_calling_samples_file = sys.argv[17]
+outlier_calling_samples_file = sys.argv[13]
+
+lam = float(sys.argv[14])
 
 
-#tissue types in sample attribute file are spelled differently than 'traditional'. This provides a conversion between the two
-sample_attribute_file_tissue_type = get_sample_attribute_tissue_type(tissue_list_input_file,tissue_type)
-
-call_outliers(tissue_type,tissue_specific_jxn_file,tissue_specific_outlier_file,outlier_calling_dm_output_dir,max_dm_junctions,jxn_filter_method,node_number,total_nodes,covariate_regression_method,sample_attribute_file,sample_attribute_file_tissue_type,v6p_covariate_file,rna_seq_samples_file,num_pc,filter_global_outlier_method,v6_sample_attribute_file,outlier_calling_samples_file)
+call_outliers(tissue_type, tissue_specific_jxn_file, tissue_specific_outlier_file, outlier_calling_dm_output_dir, max_dm_junctions, jxn_filter_method, node_number, total_nodes, covariate_regression_method, covariate_file, rna_seq_samples_file, num_pc, outlier_calling_samples_file, lam)

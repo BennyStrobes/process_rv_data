@@ -13,6 +13,7 @@ def extract_tissues(tissue_list_input_file):
     return arr
 
 
+# The cluster ss1 is previously mapped to and the cluster ss2 is previously mapped to disagree. --> Merge clusters to a new one and delete old
 def merge_clusters(ss1, ss2, ss_to_clusters, clusters, cluster_number, header_line):
     cluster_name_old_1 = ss_to_clusters[ss1]  # Cluster name corresponding to old ss1
     cluster_name_old_2 = ss_to_clusters[ss2]  # Cluster name corresponding to old ss2
@@ -43,6 +44,7 @@ def merge_clusters(ss1, ss2, ss_to_clusters, clusters, cluster_number, header_li
     return ss_to_clusters, clusters
 
 
+# Update objects 'clusters', 'ss_to_clusters', and 'cluster_number' for this specific tissue
 def initial_pass_for_cluster_ids(input_file, clusters, ss_to_clusters, cluster_number):
     f = open(input_file)
     head_count = 0
@@ -60,6 +62,7 @@ def initial_pass_for_cluster_ids(input_file, clusters, ss_to_clusters, cluster_n
         ss1 = header_info[0] + '_' + header_info[1]  # String corresponding to one of splice sites for this jxn
         ss2 = header_info[0] + '_' + header_info[2]  # String corresponding to other spice site for this jxn
 
+        # Four different cases to deal with...
         if ss1 not in ss_to_clusters and ss2 not in ss_to_clusters:  # Neither splice site has been seen before --> create new cluster_id
             cluster_name = 'cluster' + str(cluster_number)
             ss_to_clusters[ss1] = cluster_name
@@ -183,9 +186,3 @@ input_suffix = '_hg19_filtered.txt'  # Suffix of input files
 output_suffix = '_hg19_filtered_xt_reclustered.txt'  # Suffix of outputfiles
 
 run_analysis(tissues, clusters_filter_output_dir, input_suffix, output_suffix)
-
-
-'''
-ERROR CHECKING RUN:
-1. A given splice site always maps to the same cluster across tissues
-'''

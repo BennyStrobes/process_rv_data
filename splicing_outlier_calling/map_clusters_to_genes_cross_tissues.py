@@ -140,9 +140,9 @@ def map_clusters_to_genes(tissues, gencode_hg19_file, clusters_filter_output_dir
 
 
 def report_cluster_info(tissues, clusters_filter_output_dir, output_suffix, output_file):
-    clusters = {}
+    clusters = {}  # clusters[cluster_id]['jxns'] yields array of all jxn ids that are mapped to that cluster. clusters[cluster_id]['genes'] contains an array of all ensemble id genes that the cluster is mapped to
     for tissue in tissues:
-        file_name = clusters_filter_output_dir + tissue + output_suffix
+        file_name = clusters_filter_output_dir + tissue + output_suffix  # File that was just created in 'map_clusters_to_genes'
         f = open(file_name)
         count = 0
         for line in f:
@@ -156,17 +156,18 @@ def report_cluster_info(tissues, clusters_filter_output_dir, output_suffix, outp
             cluster_id = junction_info[3]
             jxn_name = junction_info[0] + ':' + junction_info[1] + ':' + junction_info[2]
             genes = junction_info[4].split(',')
-            if cluster_id not in clusters:
+            if cluster_id not in clusters:  # Cluster id has never been seen before
                 clusters[cluster_id] = {}
                 clusters[cluster_id]['jxns'] = []
                 clusters[cluster_id]['jxns'].append(jxn_name)
                 clusters[cluster_id]['genes'] = []
                 for gene in genes:
                     clusters[cluster_id]['genes'].append(gene)
-            else:
+            else:  # Cluster id has been seen before. No need to initialize
                 clusters[cluster_id]['jxns'].append(jxn_name)
                 for gene in genes:
                     clusters[cluster_id]['genes'].append(gene)
+    # Print mapping from clusters --> (jxns, genes) to an output file
     t = open(output_file, 'w')
     t.write('cluster_id\tjxns\tgenes\n')
     for cluster in sorted(clusters.keys()):
@@ -186,5 +187,5 @@ output_suffix = '_hg19_filtered_xt_reclustered_gene_mapped.txt'  # Suffix of out
 
 map_clusters_to_genes(tissues, gencode_hg19_file, clusters_filter_output_dir, input_suffix, output_suffix)
 
-# Make output file containing all clusters as well as which junctions are mapped to which cluster, as well as which genes are mapped to which cluster
+# Make output file containing all clusters (generated in map_clusters_to_genes) as well as which junctions are mapped to which cluster, as well as which genes are mapped to which cluster
 report_cluster_info(tissues, clusters_filter_output_dir, output_suffix, clusters_filter_output_dir + 'cluster_info.txt')

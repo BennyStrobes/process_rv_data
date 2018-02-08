@@ -1,5 +1,5 @@
 #!/bin/sh
-#SBATCH --time=10:00:00
+#SBATCH --time=05:00:00
 
 
 tissue_list_input_file="$1"

@@ -28,4 +28,3 @@ total_nodes = int(sys.argv[2])
 tissue_specific_outlier_root = sys.argv[3]
 
 go(tissue_type, total_nodes, tissue_specific_outlier_root, 'emperical_pvalue.txt')
-go(tissue_type, total_nodes, tissue_specific_outlier_root, 'parametric_pvalue.txt')

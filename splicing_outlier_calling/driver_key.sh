@@ -10,8 +10,6 @@
 #############################################################
 #Input data
 #############################################################
-#File containing which GTEx samples are to be used for each tissue. Filter list on val(column[27]) == 'RNASEQ'
-sample_attribute_file="/work-zfs/abattle4/lab_data/GTEx_v7/sample_annotations/GTEx_Analysis_2016-01-15_v7_SampleAttributesDS.txt"
 
 #V6 sample attribute file that contains 'flagged samples'
 v6_sample_attribute_file="/work-zfs/abattle4/lab_data/GTEx_v6p/sample_annotations/GTEx_Data_2014-06-13_Annotations_SampleAttributesDS.txt"
@@ -42,10 +40,7 @@ gencode_hg19_gene_annotation_file="/work-zfs/abattle4/lab_data/hg19/gencode_gene
 #####2. 'hg38ToHg19.over.chain.gz'   --> for converting from hg38 to hg19
 liftover_directory="/work-zfs/abattle4/bstrober/tools/liftOver_x86/"
 
-#File containing TPM scores for all RNA-seq samples in V7 for all genes
-read_counts_tpm_file="/scratch1/battle-fs1/GTEx_Analysis_2016-01-15_v7/rna-seq/GTEx_Analysis_2016-01-15_v7_RSEMv1.2.22_transcript_tpm.txt.gz"
-
-#v6 covariate directory
+#v6p covariate directory. Also contains samples used in v6p analysis
 covariate_directory_v6="/work-zfs/abattle4/lab_data/GTEx_v6p/covariates/"
 
 
@@ -94,8 +89,9 @@ clusters_output_dir=$splicing_output_root"clusters/"
 clusters_filter_output_dir=$splicing_output_root"clusters_filter/"
 #Output_dir for call_outlier_dm.sh
 outlier_calling_dm_output_dir=$splicing_output_root"outlier_calling_dm/"
-#In performing outlier calling, we filter samples. This is not possible to do earlier on b/c it requires junction files. The final list of RNA-seq samples used is:
-outlier_calling_samples_dir=$splicing_output_root"outlier_calling_samples/"
+#Output dir that contains a covariate file for each gtex tissue type
+covariate_output_dir=$splicing_output_root"covariates/"
+
 
 
 
@@ -107,51 +103,41 @@ outlier_calling_samples_dir=$splicing_output_root"outlier_calling_samples/"
 
 
 #################################################################################################################
-#JXN PREPERATION
+#Sample filtering
 ##################################################################################################################
 #pre_process.sh produces lists of what gtex samples will be used in which tissue
 #Output files made (all we be written in pre_process_output_dir)
 ##1. *_rnaseq_sample_ids.txt where * is the conventional_tissue_name. These files are simply a list of all GTEx RNASEQ samples used for this tissue.
-##2. all_rna_samples_file_locations.txt. This file is just a list of all the absolute file locations from part 1. Used for downstream analysis
-##3. all_individuals.txt. A list of all of the individuals across all tissues. (going to ignore this for now. Because we are limiting to individuals with RNA seq samples)
-##4. tissue_sample_counts.txt. A table that contains information on how many gtex samples are in each tissue. Column 0 is the gtex tissue name and column 1 is the number of samples in that tissue.
+##2. all_individuals.txt. A list of all of the individuals across all tissues. (going to ignore this for now. Because we are limiting to individuals with RNA seq samples)
+##3. tissue_sample_counts.txt. A table that contains information on how many gtex samples are in each tissue. Column 0 is the gtex tissue name and column 1 is the number of samples in that tissue.
 #NOTE: By samples, I mean RNA-seq samples. By individuals, I mean actual people. So for gtex 1 individual may have multiple samples. But 1 sample only has 1 individual. 
 #Runtime: < 1 min
-#Spot checked
 ###################################################################################################################
 if false; then
-sh pre_process.sh $sample_attribute_file $tissue_list_input_file $pre_process_output_dir
+sh pre_process.sh $v6_sample_attribute_file $tissue_list_input_file $pre_process_output_dir $covariate_directory_v6
 fi
 
-#A file generated from pre_process.sh.
-#Each line in the file corresponds to a given tissue's absolute location of a file that contains all of the gtex sample ids for that tissue
-all_rna_samples_file_locations=$pre_process_output_dir"/all_rna_samples_file_locations.txt"
 
 #################################################################################################################
-#Temporary (remove once we get all v7 samples)
+#Temporary (Remove once we figure out issue of why there are 4 samples used in gtex not in snaptron)
 ##################################################################################################################
 #filter_pre_process.sh produces lists of what gtex samples will be used in which tissue.
 #This list is simply a filtering of the above step. It is done seperately for modularity purposes
-#The filtering filters samples/individuals to those that SNAPTRON has RNA seq samples for (ie. not all of v7, though a few more than v6p)
+#The filtering filters samples/individuals to those that SNAPTRON has RNA seq samples for (ie. not all of v6p  --> There are 4 SAMPLES NOT In snaptron)
 #Output files made (all we be written in filter_pre_process_output_dir)
 ##1. *_rnaseq_sample_ids.txt where * is the conventional_tissue_name. These files are simply a list of all GTEx RNASEQ samples used for this tissue.
-##2. all_rna_samples_file_locations.txt. This file is just a list of all the absolute file locations from part 1. Used for downstream analysis
-##3. all_individuals.txt. A list of all of the individuals across all tissues. (going to ignore this for now. Because we are limiting to individuals with RNA seq samples)
-##4. tissue_sample_counts.txt. A table that contains information on how many gtex samples are in each tissue. Column 0 is the gtex tissue name and column 1 is the number of samples in that tissue.
+##2. all_individuals.txt. A list of all of the individuals across all tissues. (going to ignore this for now. Because we are limiting to individuals with RNA seq samples)
+##3. tissue_sample_counts.txt. A table that contains information on how many gtex samples are in each tissue. Column 0 is the gtex tissue name and column 1 is the number of samples in that tissue.
 #NOTE: By samples, I mean RNA-seq samples. By individuals, I mean actual people. So for gtex 1 individual may have multiple samples. But 1 sample only has 1 individual. 
 #Runtime: < 1 min
-#Spot checked
 ###################################################################################################################
 if false; then
 sh filter_pre_process.sh $pre_process_output_dir $snaptron_gtex_samples_file $filter_pre_process_output_dir $tissue_list_input_file
 fi
 
-#A file generated from filter_pre_process.sh.
-#Each line in the file corresponds to a given tissue's absolute location of a file that contains all of the gtex sample ids for that tissue
-all_rna_samples_file_locations=$filter_pre_process_output_dir"/all_rna_samples_file_locations.txt"
-
 
 ##################################################################################################################
+#JXN PREPERATION
 ##################################################################################################################
 #generate_junctions.sh produces the jxn files, filters the jxn files, converts to hg19, and maps to genes
 #As such, this script has multiple subparts
@@ -195,7 +181,7 @@ if false; then
 while read tissue_type alternative_name; do
 	sbatch generate_junctions.sh $tissue_type $filter_pre_process_output_dir $snaptron_gtex_junction_file $snaptron_gtex_samples_file $leafcutter_code_dir $junctions_output_dir $clusters_output_dir $clusters_filter_output_dir $min_reads $liftover_directory $gencode_hg19_gene_annotation_file
 done<$tissue_list_input_file
-
+fi
 ##################################################################################################################
 #generate_junctions_cross_tissues.sh performs the final steps of junction file generation that must be done by taking all tissues into account (as we want clusters to be the same across tissues)
 #As such, this script has multiple subparts:
@@ -210,20 +196,27 @@ done<$tissue_list_input_file
 #####We will filter out clusters that are not mapped to any genes
 #####It will output a file of the form $clusters_filter_output_dir$tissue_type"_hg19_filtered_xt_reclustered_gene_mapped.txt"
 #####It will also output a file of the form $clusters_filter_output_dir"cluster_info.txt"
-
-
-
-sh generate_cross_tissue_clusters.sh $tissue_list_input_file $clusters_filter_output_dir $gencode_hg19_gene_annotation_file
+if false; then
+sbatch generate_cross_tissue_clusters.sh $tissue_list_input_file $clusters_filter_output_dir $gencode_hg19_gene_annotation_file
 fi
 
 
 
 
 
+##################################################################################################################
+#Covariate Preperation
+##################################################################################################################
+num_pc="10"
+covariate_regression_method="v6p_eqtl_covariates"
 
+covariate_regression_method="junction_pc"
 
+tissue_type="Muscle_Skeletal_Analysis"
+if false; then
+sh generate_covariate_files.sh $tissue_type $covariate_output_dir $covariate_directory_v6 $covariate_regression_method $num_pc $clusters_filter_output_dir
 
-
+fi
 
 
 
@@ -235,17 +228,31 @@ fi
 ##################################################################################################################
 
 
-total_nodes="5"
-if false; then
-tissue_type="Adipose_Subcutaneous_Analysis"
-node_number="4"
-covariate_file=$covariate_directory_v6$tissue_type".covariates.txt"
+total_nodes="20"
+tissue_type="Muscle_Skeletal_Analysis"
+covariate_regression_method_data="junction_pc"
+covariate_regression_method="junction_pc_no_regress_reg"
+num_pc="10"
+node_number="5"
+lam="100"
+covariate_file=$covariate_output_dir$tissue_type"_"$covariate_regression_method_data"_"$num_pc"_covariates.txt"
 tissue_specific_jxn_file=$clusters_filter_output_dir$tissue_type"_hg19_filtered_xt_reclustered_gene_mapped.txt"
 rna_seq_samples_file=$filter_pre_process_output_dir$tissue_type"_rnaseq_sample_ids.txt"
 outlier_calling_samples_file=$outlier_calling_samples_dir$tissue_type"_"$filter_global_outlier_method"_used_samples.txt"
-tissue_specific_outlier_file=$outlier_calling_dm_output_dir$tissue_type"_"$jxn_filter_method"_"$covariate_regression_method"_"$num_pc"_"$filter_global_outlier_method"_"$node_number
-sh call_outlier_dm.sh $tissue_type $tissue_specific_jxn_file $tissue_specific_outlier_file $outlier_calling_dm_output_dir $max_dm_junctions $jxn_filter_method $node_number $total_nodes $covariate_regression_method $sample_attribute_file $tissue_list_input_file $covariate_file $rna_seq_samples_file $num_pc $filter_global_outlier_method $v6_sample_attribute_file $outlier_calling_samples_file
+
+if false; then
+tissue_specific_outlier_file=$outlier_calling_dm_output_dir$tissue_type"_"$jxn_filter_method"_"$covariate_regression_method"_"$lam"_"$num_pc"_"$node_number
+sh call_outlier_dm.sh $tissue_type $tissue_specific_jxn_file $tissue_specific_outlier_file $outlier_calling_dm_output_dir $max_dm_junctions $jxn_filter_method $node_number $total_nodes $covariate_regression_method $covariate_file $rna_seq_samples_file $num_pc $outlier_calling_samples_file $lam
+fi 
+if false; then
+for node_number in $(seq 0 `expr $total_nodes - "1"`); do
+    echo $node_number
+    tissue_specific_outlier_file=$outlier_calling_dm_output_dir$tissue_type"_"$jxn_filter_method"_"$covariate_regression_method"_"$lam"_"$num_pc"_"$node_number
+    sbatch call_outlier_dm.sh $tissue_type $tissue_specific_jxn_file $tissue_specific_outlier_file $outlier_calling_dm_output_dir $max_dm_junctions $jxn_filter_method $node_number $total_nodes $covariate_regression_method $covariate_file $rna_seq_samples_file $num_pc $outlier_calling_samples_file $lam
+done
 fi
+
+
 if false; then
 while read tissue_type; do 
 
@@ -269,8 +276,7 @@ while read tissue_type; do
 
 
 done<"/scratch1/battle-fs1/bstrober/rare_variants/rare_splice/outlier_calling/downloaded_data/gtex_tissues_10_1.txt"
-fi
-if false; then
+
 while read tissue_type; do 
 	echo $tissue_type
 	tissue_specific_outlier_root=$outlier_calling_dm_output_dir$tissue_type"_"$jxn_filter_method"_"$covariate_regression_method"_"$num_pc"_"$filter_global_outlier_method"_"
@@ -283,3 +289,68 @@ done<"/scratch1/battle-fs1/bstrober/rare_variants/rare_splice/outlier_calling/do
 
 fi
 
+
+if false; then
+
+total_nodes="20"
+tissue_type="Muscle_Skeletal_Analysis"
+covariate_regression_method="junction_pc_no_regress_reg"
+num_pc="10"
+lamda="0"
+tissue_specific_jxn_file=$clusters_filter_output_dir$tissue_type"_hg19_filtered_xt_reclustered_gene_mapped.txt"
+tissue_specific_outlier_root=$outlier_calling_dm_output_dir$tissue_type"_"$jxn_filter_method"_"$covariate_regression_method"_"$lamda"_"$num_pc"_"
+sh merge_outlier_calling_results.sh $tissue_type $total_nodes $tissue_specific_outlier_root $tissue_specific_jxn_file
+
+total_nodes="20"
+tissue_type="Muscle_Skeletal_Analysis"
+covariate_regression_method="junction_pc_no_regress_reg"
+num_pc="10"
+lamda=".1"
+tissue_specific_jxn_file=$clusters_filter_output_dir$tissue_type"_hg19_filtered_xt_reclustered_gene_mapped.txt"
+tissue_specific_outlier_root=$outlier_calling_dm_output_dir$tissue_type"_"$jxn_filter_method"_"$covariate_regression_method"_"$lamda"_"$num_pc"_"
+sh merge_outlier_calling_results.sh $tissue_type $total_nodes $tissue_specific_outlier_root $tissue_specific_jxn_file
+
+total_nodes="20"
+tissue_type="Muscle_Skeletal_Analysis"
+covariate_regression_method="junction_pc_no_regress_reg"
+num_pc="10"
+lamda="1"
+tissue_specific_jxn_file=$clusters_filter_output_dir$tissue_type"_hg19_filtered_xt_reclustered_gene_mapped.txt"
+tissue_specific_outlier_root=$outlier_calling_dm_output_dir$tissue_type"_"$jxn_filter_method"_"$covariate_regression_method"_"$lamda"_"$num_pc"_"
+sh merge_outlier_calling_results.sh $tissue_type $total_nodes $tissue_specific_outlier_root $tissue_specific_jxn_file
+
+total_nodes="20"
+tissue_type="Muscle_Skeletal_Analysis"
+covariate_regression_method="junction_pc_no_regress_reg"
+num_pc="10"
+lamda="10"
+tissue_specific_jxn_file=$clusters_filter_output_dir$tissue_type"_hg19_filtered_xt_reclustered_gene_mapped.txt"
+tissue_specific_outlier_root=$outlier_calling_dm_output_dir$tissue_type"_"$jxn_filter_method"_"$covariate_regression_method"_"$lamda"_"$num_pc"_"
+sh merge_outlier_calling_results.sh $tissue_type $total_nodes $tissue_specific_outlier_root $tissue_specific_jxn_file
+
+total_nodes="20"
+tissue_type="Muscle_Skeletal_Analysis"
+covariate_regression_method="junction_pc_no_regress_reg"
+num_pc="10"
+lamda="100"
+tissue_specific_jxn_file=$clusters_filter_output_dir$tissue_type"_hg19_filtered_xt_reclustered_gene_mapped.txt"
+tissue_specific_outlier_root=$outlier_calling_dm_output_dir$tissue_type"_"$jxn_filter_method"_"$covariate_regression_method"_"$lamda"_"$num_pc"_"
+sh merge_outlier_calling_results.sh $tissue_type $total_nodes $tissue_specific_outlier_root $tissue_specific_jxn_file
+fi
+if false; then
+
+num_pc="4"
+tissue_specific_jxn_file=$clusters_filter_output_dir$tissue_type"_hg19_filtered_xt_reclustered_gene_mapped.txt"
+tissue_specific_outlier_root=$outlier_calling_dm_output_dir$tissue_type"_"$jxn_filter_method"_"$covariate_regression_method"_"$num_pc"_"
+sh merge_outlier_calling_results.sh $tissue_type $total_nodes $tissue_specific_outlier_root $tissue_specific_jxn_file
+
+num_pc="7"
+tissue_specific_jxn_file=$clusters_filter_output_dir$tissue_type"_hg19_filtered_xt_reclustered_gene_mapped.txt"
+tissue_specific_outlier_root=$outlier_calling_dm_output_dir$tissue_type"_"$jxn_filter_method"_"$covariate_regression_method"_"$num_pc"_"
+sh merge_outlier_calling_results.sh $tissue_type $total_nodes $tissue_specific_outlier_root $tissue_specific_jxn_file
+
+num_pc="10"
+tissue_specific_jxn_file=$clusters_filter_output_dir$tissue_type"_hg19_filtered_xt_reclustered_gene_mapped.txt"
+tissue_specific_outlier_root=$outlier_calling_dm_output_dir$tissue_type"_"$jxn_filter_method"_"$covariate_regression_method"_"$num_pc"_"
+sh merge_outlier_calling_results.sh $tissue_type $total_nodes $tissue_specific_outlier_root $tissue_specific_jxn_file
+fi

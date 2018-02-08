@@ -9,18 +9,12 @@ data {
   real<lower=0> lam; // ridge regression param
 }
 parameters {
-  simplex[K] beta_raw[P]; // symmetric K-1 dof encoding of beta
-  real beta_scale[P]; 
+  matrix[K,P] beta;
   real<lower=0> conc[K]; // concentration parameter
 }
 
 model {
-  // beta reparameterization (Section 5.6 in the Stan manual)
-  matrix[K,P] beta;
   for (k in 1:K) {
-    for (p in 1:P) {
-      beta[k,p] <- beta_scale[p] * (beta_raw[p][k] - 1.0 / K);
-    }
     for (p in 2:P) {
       // increment_log_prob(-lam * fabs(beta[k,p]));
       increment_log_prob(-lam * beta[k,p] * beta[k,p]);
