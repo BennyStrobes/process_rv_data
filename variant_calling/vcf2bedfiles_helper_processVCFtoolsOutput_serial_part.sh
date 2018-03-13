@@ -74,7 +74,7 @@ if [ "$TYPE" = "SNPs" ]; then
                for(i=5;i<=NF-1;i=i+2){printf "\t%s",$i};
                for(j=NF+1;j<=13;j=j+2){printf "\t."};
                printf "\n"}' | \
-	sort -k1,1 -k2,2n > $af
+	sort --temporary-directory=$outdir -k1,1 -k2,2n > $af
 
 fi
 if [ "$TYPE" = "indels" ]; then

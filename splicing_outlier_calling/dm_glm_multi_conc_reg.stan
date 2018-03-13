@@ -6,7 +6,6 @@ data {
   vector[K] y[N]; // counts 
   real<lower=0> concShape; // concentration shape
   real<lower=0> concRate; // concentration rate
-  real<lower=0> lam; // ridge regression param
 }
 parameters {
   matrix[K,P] beta;
@@ -14,13 +13,6 @@ parameters {
 }
 
 model {
-  for (k in 1:K) {
-    for (p in 2:P) {
-      // increment_log_prob(-lam * fabs(beta[k,p]));
-      increment_log_prob(-lam * beta[k,p] * beta[k,p]);
-    }
-  }
-
   conc ~ gamma(concShape, concRate);
   for (n in 1:N) {
     vector[K] a; 
@@ -42,4 +34,6 @@ model {
     }
     increment_log_prob(lgamma(suma)+sum(lGaPlusY)-lgamma(suma+sum(y[n]))-sum(lGaA));
   }
+  print(conc);
+  print(beta);
 }

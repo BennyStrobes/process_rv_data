@@ -6,7 +6,6 @@ data {
   vector[K] y[N]; // counts 
   real<lower=0> concShape; // concentration shape
   real<lower=0> concRate; // concentration rate
-  real<lower=0> lam; // ridge regression param
 }
 parameters {
   simplex[K] beta_raw[P]; // symmetric K-1 dof encoding of beta
@@ -17,15 +16,13 @@ parameters {
 model {
   // beta reparameterization (Section 5.6 in the Stan manual)
   matrix[K,P] beta;
-  for (k in 1:K) {
-    for (p in 1:P) {
+  for (k in 1:K)
+    for (p in 1:P)
       beta[k,p] <- beta_scale[p] * (beta_raw[p][k] - 1.0 / K);
-    }
-    for (p in 2:P) {
-      // increment_log_prob(-lam * fabs(beta[k,p]));
-      increment_log_prob(-lam * beta[k,p] * beta[k,p]);
-    }
-  }
+
+  for (k in 1:K)
+    for (p in 2:P)
+      beta[k, p] ~ normal(0,5);
 
   conc ~ gamma(concShape, concRate);
   for (n in 1:N) {
@@ -48,4 +45,7 @@ model {
     }
     increment_log_prob(lgamma(suma)+sum(lGaPlusY)-lgamma(suma+sum(y[n]))-sum(lGaA));
   }
+  print(conc);
+  print(beta_scale);
+  print(beta_raw);
 }

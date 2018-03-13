@@ -35,6 +35,8 @@ echo "Processing VCF files with vcftools..."
 
 #*************************************************************************************************
 sh vcf2bedfiles_helper_processVCF.sh $vcf $indincl $prefix
+
+
 echo "Processing VCF files (SNPs/indels) done."
 date
 

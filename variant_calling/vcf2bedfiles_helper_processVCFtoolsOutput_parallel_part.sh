@@ -119,7 +119,7 @@ processgt() {
 
     if [ "$TYPE" = "SNPs" ]; then
 	cat $gt | cut -f1,2,$i | skip_header | filter_genotypes | \
-	    awk 'BEGIN{OFS="\t"}{print $1,$2-1,$2,$3}' | sort -k1,1 -k2,2n | \
+	    awk 'BEGIN{OFS="\t"}{print $1,$2-1,$2,$3}' | sort --temporary-directory=$outdir -k1,1 -k2,2n | \
 	    bedtools intersect -sorted -wa -wb -a stdin -b $af | \
 	    awk 'BEGIN{OFS="\t"}{split($4,geno,"/"); i=10+geno[1]; j=10+geno[2];print $1,$2,$3,$4,$8,$9,$i,$j}' | \
 	    clean_genotypes | \

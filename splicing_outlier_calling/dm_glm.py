@@ -7,7 +7,11 @@ import pickle
 
 
 #DM_GLM = pystan.StanModel(file = "dm_glm_multi_conc.stan")
-DM_GLM = pystan.StanModel(file = "dm_glm_multi_conc_reg.stan")
+#f = open('dm_glm_multi_conc.pkl', 'wb')
+#pickle.dump(DM_GLM, f)
+#f.close()
+DM_GLM = pickle.load(open('dm_glm_multi_conc.pkl','rb'))
+#DM_GLM = pystan.StanModel(file = "dm_glm_multi_conc_reg.stan")
 #DM_GLM = pickle.load(open('dm_glm_multi_conc.pkl','rb'))
 
 #@param y is junction matrix of size (N,K)
@@ -26,9 +30,9 @@ def dirichlet_multinomial_fit(y):
     #DM_GLM = pickle.load(open('dm_glm_multi_conc.pkl','rb'))
     op = DM_GLM.optimizing(data = data,verbose=False,iter=5000,seed=1)
     #Convert betas from simplex space to real space
-    betas = correct_betas(op['beta_raw'],op['beta_scale'],K,P)
+    # betas = correct_betas(op['beta_raw'],op['beta_scale'],K,P)
     #compute actual alpha that defines DM
-    alphas = compute_alphas_intercept_only_multi_conc(betas,op['conc'])
+    alphas = compute_alphas_intercept_only_multi_conc(op['beta'], op['conc'])
     return np.asarray(alphas)
 
 #@param y is a junction matrix of size(N,K)
@@ -60,23 +64,24 @@ def regress_covariates_with_dm_glm(y,x):
     y_resid = np.abs(np.rint(y_resid).clip(0))
     return y_resid
 
-def dirichlet_multinomial_glm_fit(y,x, lam):
+def dirichlet_multinomial_glm_fit(y,x):
     if np.array_equal(x[:,0],np.ones(x.shape[0])) == False:
         print('FATAL ERROR: FIRST COLUMN OF covariate matrix must be intercept')
         pdb.set_trace()
     #fixed parameters (provide relaxed priors to add optimization)
-    concShape=1.0001
-    concRate=1e-4
+    concShape=1.01
+    concRate=0.01
     N,K = y.shape
     N,P = x.shape
-    data = dict(N=N, lam=lam, K=K, P=P,y=y, x=x, concShape=concShape, concRate=concRate)
+    data = dict(N=N, K=K, P=P,y=y, x=x, concShape=concShape, concRate=concRate)
     #STAN optimization
     #DM_GLM = pickle.load(open('dm_glm_multi_conc.pkl','rb'))
-    op = DM_GLM.optimizing(data = data,verbose=False,iter=5000)
+    seed = np.random.randint(10000000) + 1
+    op = DM_GLM.optimizing(data=data, verbose=False, iter=10000, seed=seed)
     #Convert betas from simplex space to real space
-    betas = np.transpose(op['beta'])
-    #betas = correct_betas(op['beta_raw'],op['beta_scale'],K,P)
-    alpha_matrix = dm_glm_multi_conc_predict_alphas(betas,x,y,op['conc'])
+    #betas = np.transpose(op['beta'])
+    betas = correct_betas(op['beta_raw'],op['beta_scale'],K,P)
+    alpha_matrix = dm_glm_multi_conc_predict_alphas(betas, x, y, op['conc'])
     return alpha_matrix, betas, op['conc']
 
 
@@ -155,7 +160,7 @@ def compute_alphas_intercept_only_multi_conc(betas,conc_param):
     term_a = (np.exp(betas)/np.sum(np.exp(betas)))
     alphas = []
     for i,ele in enumerate(conc_param):
-        alphas.append(ele*term_a[0,i])
+        alphas.append(ele*term_a[i,0])
     return alphas
 
 #x is covariates

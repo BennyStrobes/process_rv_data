@@ -21,6 +21,11 @@ rna_seq_individuals="/work-zfs/abattle4/bstrober/rare_variant/rare_splice/proces
 #Gencode hg19 gene annotation file
 gencode_hg19_gene_annotation_file="/work-zfs/abattle4/lab_data/hg19/gencode_gene_annotations/gencode.v19.annotation.gtf.gz"
 
+# Directory containing 1K genomes data (downloaded from ftp://ftp-trace.ncbi.nih.gov/1000genomes/ftp/release/20130502/)
+k_genomes_input_dir="/work-zfs/abattle4/lab_data/1k_genomes/"
+
+
+
 ##############################################################
 #Used directories
 ###############################################################
@@ -34,6 +39,9 @@ variant_gene_mapping_output_dir=$variant_calling_root_dir"variant_gene_mapping/"
 
 # Contains names of all samples that we have WGS for
 wgs_samples_dir=$variant_calling_root_dir"wgs_samples/"
+
+# Contains processed 1KG genomes data
+k_genomes_process_dir=$variant_calling_root_dir"1k_genomes_processed/"
 
 ##############################################################
 #Parameters
@@ -55,13 +63,21 @@ gene_mapping_method="method_1"
 #See https://github.com/joed3/GTExV6PRareVariation for reference on their code
 total_jobs="80"
 
+if false; then
 sbatch variant_extraction_nick_emily_serial_part.sh $vcf_file $subject_phenotype_file $rna_seq_individuals $wgs_samples_dir
-
+fi
 
 job_number="0"
 if false; then
 sbatch variant_extraction_nick_emily_parallel_part.sh $vcf_file $wgs_samples_dir $job_number $total_jobs
 fi
+
+
+if false; then
+job_number="0"
+sbatch variant_extraction_nick_emily_parallel_part.sh $vcf_file $wgs_samples_dir $job_number $total_jobs
+fi
+
 if false; then
 for job_number in $(seq 1 `expr $total_jobs - "1"`); do
 	echo $job_number
@@ -69,17 +85,25 @@ for job_number in $(seq 1 `expr $total_jobs - "1"`); do
 done
 fi
 
+
+
+#################################################
+# Process 1K-genomes data
+##################################################
+if false; then
+sbatch extract.1kg.AF.sh $k_genomes_input_dir $k_genomes_process_dir $wgs_samples_dir
+fi
+
 #File created all individuals used
 #Basically a result of cross filtering the subject_phenotype_file file and rna_seq_individuals file
-input_individuals="/scratch1/battle-fs1/bstrober/rare_variants/rare_splice/variant_calling/downloaded_data/extra_data/EA_gtex_VCFids.txt"
+input_individuals=$wgs_samples_dir"EA_gtex_VCFids.txt"
 #################################################################################################################
 ##################################################################################################################
 #variant_to_gene_mapping.sh maps variants (discovered in variant_extraction_nick_emily.sh) to genes (if they lie on the gene)
 #It produces the output file "all_variants_gene_mapping_"$gene_mapping_method".txt" (in $variant_gene_mapping_output_dir)
 #$gene_mapping_method refers to the way by which a variant is matpped to a given gene. So far, gene_mapping_method's that are currently implemented:
 ###method_1: Limit to protein coding. A gene considered to be what gencode defines as 'gene', as well as 1 KB upstream and 1KB downstream
-if false; then
 all_variants_gene_mapping_file=$variant_gene_mapping_output_dir"all_variants_gene_mapping_"$gene_mapping_method".txt"
-sbatch variant_to_gene_mapping.sh $variant_bed_dir $input_individuals $all_variants_gene_mapping_file $gencode_hg19_gene_annotation_file $gene_mapping_method
-fi
+sbatch variant_to_gene_mapping.sh $wgs_samples_dir"individuals/" $input_individuals $all_variants_gene_mapping_file $gencode_hg19_gene_annotation_file $gene_mapping_method
+
 

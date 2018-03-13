@@ -91,7 +91,8 @@ clusters_filter_output_dir=$splicing_output_root"clusters_filter/"
 outlier_calling_dm_output_dir=$splicing_output_root"outlier_calling_dm/"
 #Output dir that contains a covariate file for each gtex tissue type
 covariate_output_dir=$splicing_output_root"covariates/"
-
+# Output dir that contains samples used in outlier calling analysis
+outlier_calling_samples_dir=$splicing_output_root"outlier_calling_samples/"
 
 
 
@@ -173,10 +174,6 @@ fi
 #Therefor, remove jxns that belong to a cluster with only 1 junction.
 ##output saved as *_hg19_filtered.txt where * is tissue type. Saved in 'clusters_filter_output_dir'
 ##################################################################################################################
-tissue_type="Adipose_Subcutaneous_Analysis"
-alternative_name="Adipose - Subcutaneous"
-sbatch generate_junctions.sh $tissue_type $filter_pre_process_output_dir $snaptron_gtex_junction_file $snaptron_gtex_samples_file $leafcutter_code_dir $junctions_output_dir $clusters_output_dir $clusters_filter_output_dir $min_reads $liftover_directory $gencode_hg19_gene_annotation_file
-
 if false; then
 while read tissue_type alternative_name; do
 	sbatch generate_junctions.sh $tissue_type $filter_pre_process_output_dir $snaptron_gtex_junction_file $snaptron_gtex_samples_file $leafcutter_code_dir $junctions_output_dir $clusters_output_dir $clusters_filter_output_dir $min_reads $liftover_directory $gencode_hg19_gene_annotation_file
@@ -207,15 +204,13 @@ fi
 ##################################################################################################################
 #Covariate Preperation
 ##################################################################################################################
-num_pc="10"
+num_pc="3"
 covariate_regression_method="v6p_eqtl_covariates"
 
 covariate_regression_method="junction_pc"
-
-tissue_type="Muscle_Skeletal_Analysis"
+tissue_type="Adipose_Subcutaneous_Analysis"
 if false; then
-sh generate_covariate_files.sh $tissue_type $covariate_output_dir $covariate_directory_v6 $covariate_regression_method $num_pc $clusters_filter_output_dir
-
+sbatch generate_covariate_files.sh $tissue_type $covariate_output_dir $covariate_directory_v6 $covariate_regression_method $num_pc $clusters_filter_output_dir
 fi
 
 
@@ -226,131 +221,102 @@ fi
 #################################################################################################################
 #DM OUTLIER CALLING
 ##################################################################################################################
-
-
-total_nodes="20"
-tissue_type="Muscle_Skeletal_Analysis"
+total_nodes="50"
+tissue_type="Adipose_Subcutaneous_Analysis"
 covariate_regression_method_data="junction_pc"
-covariate_regression_method="junction_pc_no_regress_reg"
-num_pc="10"
-node_number="5"
-lam="100"
-covariate_file=$covariate_output_dir$tissue_type"_"$covariate_regression_method_data"_"$num_pc"_covariates.txt"
 tissue_specific_jxn_file=$clusters_filter_output_dir$tissue_type"_hg19_filtered_xt_reclustered_gene_mapped.txt"
 rna_seq_samples_file=$filter_pre_process_output_dir$tissue_type"_rnaseq_sample_ids.txt"
 outlier_calling_samples_file=$outlier_calling_samples_dir$tissue_type"_"$filter_global_outlier_method"_used_samples.txt"
 
-if false; then
-tissue_specific_outlier_file=$outlier_calling_dm_output_dir$tissue_type"_"$jxn_filter_method"_"$covariate_regression_method"_"$lam"_"$num_pc"_"$node_number
-sh call_outlier_dm.sh $tissue_type $tissue_specific_jxn_file $tissue_specific_outlier_file $outlier_calling_dm_output_dir $max_dm_junctions $jxn_filter_method $node_number $total_nodes $covariate_regression_method $covariate_file $rna_seq_samples_file $num_pc $outlier_calling_samples_file $lam
-fi 
+covariate_regression_method="none"
+num_pc="0"
+covariate_file=$covariate_output_dir$tissue_type"_"$covariate_regression_method_data"_"$num_pc"_covariates.txt"
 if false; then
 for node_number in $(seq 0 `expr $total_nodes - "1"`); do
-    echo $node_number
-    tissue_specific_outlier_file=$outlier_calling_dm_output_dir$tissue_type"_"$jxn_filter_method"_"$covariate_regression_method"_"$lam"_"$num_pc"_"$node_number
-    sbatch call_outlier_dm.sh $tissue_type $tissue_specific_jxn_file $tissue_specific_outlier_file $outlier_calling_dm_output_dir $max_dm_junctions $jxn_filter_method $node_number $total_nodes $covariate_regression_method $covariate_file $rna_seq_samples_file $num_pc $outlier_calling_samples_file $lam
+    tissue_specific_outlier_file=$outlier_calling_dm_output_dir$tissue_type"_"$jxn_filter_method"_"$covariate_regression_method"_"$num_pc"_"$node_number
+    sbatch call_outlier_dm.sh $tissue_type $tissue_specific_jxn_file $tissue_specific_outlier_file $outlier_calling_dm_output_dir $max_dm_junctions $jxn_filter_method $node_number $total_nodes $covariate_regression_method $covariate_file $rna_seq_samples_file $num_pc $outlier_calling_samples_file
+done
+fi
+
+covariate_regression_method="junction_pc_no_regress_reg"
+num_pc="1"
+covariate_file=$covariate_output_dir$tissue_type"_"$covariate_regression_method_data"_"$num_pc"_covariates.txt"
+if false; then
+for node_number in $(seq 0 `expr $total_nodes - "1"`); do
+    tissue_specific_outlier_file=$outlier_calling_dm_output_dir$tissue_type"_"$jxn_filter_method"_"$covariate_regression_method"_"$num_pc"_"$node_number
+    sbatch call_outlier_dm.sh $tissue_type $tissue_specific_jxn_file $tissue_specific_outlier_file $outlier_calling_dm_output_dir $max_dm_junctions $jxn_filter_method $node_number $total_nodes $covariate_regression_method $covariate_file $rna_seq_samples_file $num_pc $outlier_calling_samples_file
+done
+fi
+
+covariate_regression_method="junction_pc_no_regress_reg"
+num_pc="3"
+covariate_file=$covariate_output_dir$tissue_type"_"$covariate_regression_method_data"_"$num_pc"_covariates.txt"
+if false; then
+for node_number in $(seq 0 `expr $total_nodes - "1"`); do
+    tissue_specific_outlier_file=$outlier_calling_dm_output_dir$tissue_type"_"$jxn_filter_method"_"$covariate_regression_method"_"$num_pc"_"$node_number
+    sbatch call_outlier_dm.sh $tissue_type $tissue_specific_jxn_file $tissue_specific_outlier_file $outlier_calling_dm_output_dir $max_dm_junctions $jxn_filter_method $node_number $total_nodes $covariate_regression_method $covariate_file $rna_seq_samples_file $num_pc $outlier_calling_samples_file
 done
 fi
 
 
+covariate_regression_method="junction_pc_only_no_regress_reg"
+num_pc="1"
+covariate_file=$covariate_output_dir$tissue_type"_"$covariate_regression_method_data"_"$num_pc"_covariates.txt"
 if false; then
-while read tissue_type; do 
+for node_number in $(seq 0 `expr $total_nodes - "1"`); do
+    tissue_specific_outlier_file=$outlier_calling_dm_output_dir$tissue_type"_"$jxn_filter_method"_"$covariate_regression_method"_"$num_pc"_"$node_number
+    sbatch call_outlier_dm.sh $tissue_type $tissue_specific_jxn_file $tissue_specific_outlier_file $outlier_calling_dm_output_dir $max_dm_junctions $jxn_filter_method $node_number $total_nodes $covariate_regression_method $covariate_file $rna_seq_samples_file $num_pc $outlier_calling_samples_file
+done
+fi
 
-	covariate_file=$covariate_directory_v6$tissue_type".covariates.txt"
+covariate_regression_method="junction_pc_only_no_regress_reg"
+num_pc="3"
+covariate_file=$covariate_output_dir$tissue_type"_"$covariate_regression_method_data"_"$num_pc"_covariates.txt"
+if false; then
+for node_number in $(seq 0 `expr $total_nodes - "1"`); do
+    tissue_specific_outlier_file=$outlier_calling_dm_output_dir$tissue_type"_"$jxn_filter_method"_"$covariate_regression_method"_"$num_pc"_"$node_number
+    sbatch call_outlier_dm.sh $tissue_type $tissue_specific_jxn_file $tissue_specific_outlier_file $outlier_calling_dm_output_dir $max_dm_junctions $jxn_filter_method $node_number $total_nodes $covariate_regression_method $covariate_file $rna_seq_samples_file $num_pc $outlier_calling_samples_file
+done
+fi
 
-	tissue_specific_jxn_file=$clusters_filter_output_dir$tissue_type"_hg19_filtered_xt_reclustered_gene_mapped.txt"
+if false; then
+total_nodes="50"
+tissue_type="Adipose_Subcutaneous_Analysis"
+covariate_regression_method="junction_pc_no_regress_reg"
 
-	rna_seq_samples_file=$filter_pre_process_output_dir$tissue_type"_rnaseq_sample_ids.txt"
+num_pc="1"
+tissue_specific_jxn_file=$clusters_filter_output_dir$tissue_type"_hg19_filtered_xt_reclustered_gene_mapped.txt"
+tissue_specific_outlier_root=$outlier_calling_dm_output_dir$tissue_type"_"$jxn_filter_method"_"$covariate_regression_method"_"$num_pc"_"
+sbatch merge_outlier_calling_results.sh $tissue_type $total_nodes $tissue_specific_outlier_root $tissue_specific_jxn_file
 
-	outlier_calling_samples_file=$outlier_calling_samples_dir$tissue_type"_"$filter_global_outlier_method"_used_samples.txt"
-
-
-	for node_number in $(seq 0 `expr $total_nodes - "1"`); do
-		tissue_specific_outlier_file=$outlier_calling_dm_output_dir$tissue_type"_"$jxn_filter_method"_"$covariate_regression_method"_"$num_pc"_"$filter_global_outlier_method"_"$node_number
-		echo $node_number		
-		sbatch call_outlier_dm.sh $tissue_type $tissue_specific_jxn_file $tissue_specific_outlier_file $outlier_calling_dm_output_dir $max_dm_junctions $jxn_filter_method $node_number $total_nodes $covariate_regression_method $sample_attribute_file $tissue_list_input_file $covariate_file $rna_seq_samples_file $num_pc $filter_global_outlier_method $v6_sample_attribute_file $outlier_calling_samples_file
-
-	done
-
-	echo $tissue_type
-
-
-done<"/scratch1/battle-fs1/bstrober/rare_variants/rare_splice/outlier_calling/downloaded_data/gtex_tissues_10_1.txt"
-
-while read tissue_type; do 
-	echo $tissue_type
-	tissue_specific_outlier_root=$outlier_calling_dm_output_dir$tissue_type"_"$jxn_filter_method"_"$covariate_regression_method"_"$num_pc"_"$filter_global_outlier_method"_"
-	tissue_specific_jxn_file=$clusters_filter_output_dir$tissue_type"_hg19_filtered_xt_reclustered_gene_mapped.txt"
+num_pc="3"
+tissue_specific_jxn_file=$clusters_filter_output_dir$tissue_type"_hg19_filtered_xt_reclustered_gene_mapped.txt"
+tissue_specific_outlier_root=$outlier_calling_dm_output_dir$tissue_type"_"$jxn_filter_method"_"$covariate_regression_method"_"$num_pc"_"
+sbatch merge_outlier_calling_results.sh $tissue_type $total_nodes $tissue_specific_outlier_root $tissue_specific_jxn_file
 
 
-	sh merge_outlier_calling_results.sh $tissue_type $total_nodes $tissue_specific_outlier_root $tissue_specific_jxn_file
+total_nodes="50"
+tissue_type="Adipose_Subcutaneous_Analysis"
+covariate_regression_method="junction_pc_only_no_regress_reg"
 
-done<"/scratch1/battle-fs1/bstrober/rare_variants/rare_splice/outlier_calling/downloaded_data/gtex_tissues.txt"
+num_pc="1"
+tissue_specific_jxn_file=$clusters_filter_output_dir$tissue_type"_hg19_filtered_xt_reclustered_gene_mapped.txt"
+tissue_specific_outlier_root=$outlier_calling_dm_output_dir$tissue_type"_"$jxn_filter_method"_"$covariate_regression_method"_"$num_pc"_"
+sbatch merge_outlier_calling_results.sh $tissue_type $total_nodes $tissue_specific_outlier_root $tissue_specific_jxn_file
 
+num_pc="3"
+tissue_specific_jxn_file=$clusters_filter_output_dir$tissue_type"_hg19_filtered_xt_reclustered_gene_mapped.txt"
+tissue_specific_outlier_root=$outlier_calling_dm_output_dir$tissue_type"_"$jxn_filter_method"_"$covariate_regression_method"_"$num_pc"_"
+sbatch merge_outlier_calling_results.sh $tissue_type $total_nodes $tissue_specific_outlier_root $tissue_specific_jxn_file
+
+total_nodes="50"
+tissue_type="Adipose_Subcutaneous_Analysis"
+covariate_regression_method="none"
+
+num_pc="0"
+tissue_specific_jxn_file=$clusters_filter_output_dir$tissue_type"_hg19_filtered_xt_reclustered_gene_mapped.txt"
+tissue_specific_outlier_root=$outlier_calling_dm_output_dir$tissue_type"_"$jxn_filter_method"_"$covariate_regression_method"_"$num_pc"_"
+sbatch merge_outlier_calling_results.sh $tissue_type $total_nodes $tissue_specific_outlier_root $tissue_specific_jxn_file
 fi
 
 
-if false; then
-
-total_nodes="20"
-tissue_type="Muscle_Skeletal_Analysis"
-covariate_regression_method="junction_pc_no_regress_reg"
-num_pc="10"
-lamda="0"
-tissue_specific_jxn_file=$clusters_filter_output_dir$tissue_type"_hg19_filtered_xt_reclustered_gene_mapped.txt"
-tissue_specific_outlier_root=$outlier_calling_dm_output_dir$tissue_type"_"$jxn_filter_method"_"$covariate_regression_method"_"$lamda"_"$num_pc"_"
-sh merge_outlier_calling_results.sh $tissue_type $total_nodes $tissue_specific_outlier_root $tissue_specific_jxn_file
-
-total_nodes="20"
-tissue_type="Muscle_Skeletal_Analysis"
-covariate_regression_method="junction_pc_no_regress_reg"
-num_pc="10"
-lamda=".1"
-tissue_specific_jxn_file=$clusters_filter_output_dir$tissue_type"_hg19_filtered_xt_reclustered_gene_mapped.txt"
-tissue_specific_outlier_root=$outlier_calling_dm_output_dir$tissue_type"_"$jxn_filter_method"_"$covariate_regression_method"_"$lamda"_"$num_pc"_"
-sh merge_outlier_calling_results.sh $tissue_type $total_nodes $tissue_specific_outlier_root $tissue_specific_jxn_file
-
-total_nodes="20"
-tissue_type="Muscle_Skeletal_Analysis"
-covariate_regression_method="junction_pc_no_regress_reg"
-num_pc="10"
-lamda="1"
-tissue_specific_jxn_file=$clusters_filter_output_dir$tissue_type"_hg19_filtered_xt_reclustered_gene_mapped.txt"
-tissue_specific_outlier_root=$outlier_calling_dm_output_dir$tissue_type"_"$jxn_filter_method"_"$covariate_regression_method"_"$lamda"_"$num_pc"_"
-sh merge_outlier_calling_results.sh $tissue_type $total_nodes $tissue_specific_outlier_root $tissue_specific_jxn_file
-
-total_nodes="20"
-tissue_type="Muscle_Skeletal_Analysis"
-covariate_regression_method="junction_pc_no_regress_reg"
-num_pc="10"
-lamda="10"
-tissue_specific_jxn_file=$clusters_filter_output_dir$tissue_type"_hg19_filtered_xt_reclustered_gene_mapped.txt"
-tissue_specific_outlier_root=$outlier_calling_dm_output_dir$tissue_type"_"$jxn_filter_method"_"$covariate_regression_method"_"$lamda"_"$num_pc"_"
-sh merge_outlier_calling_results.sh $tissue_type $total_nodes $tissue_specific_outlier_root $tissue_specific_jxn_file
-
-total_nodes="20"
-tissue_type="Muscle_Skeletal_Analysis"
-covariate_regression_method="junction_pc_no_regress_reg"
-num_pc="10"
-lamda="100"
-tissue_specific_jxn_file=$clusters_filter_output_dir$tissue_type"_hg19_filtered_xt_reclustered_gene_mapped.txt"
-tissue_specific_outlier_root=$outlier_calling_dm_output_dir$tissue_type"_"$jxn_filter_method"_"$covariate_regression_method"_"$lamda"_"$num_pc"_"
-sh merge_outlier_calling_results.sh $tissue_type $total_nodes $tissue_specific_outlier_root $tissue_specific_jxn_file
-fi
-if false; then
-
-num_pc="4"
-tissue_specific_jxn_file=$clusters_filter_output_dir$tissue_type"_hg19_filtered_xt_reclustered_gene_mapped.txt"
-tissue_specific_outlier_root=$outlier_calling_dm_output_dir$tissue_type"_"$jxn_filter_method"_"$covariate_regression_method"_"$num_pc"_"
-sh merge_outlier_calling_results.sh $tissue_type $total_nodes $tissue_specific_outlier_root $tissue_specific_jxn_file
-
-num_pc="7"
-tissue_specific_jxn_file=$clusters_filter_output_dir$tissue_type"_hg19_filtered_xt_reclustered_gene_mapped.txt"
-tissue_specific_outlier_root=$outlier_calling_dm_output_dir$tissue_type"_"$jxn_filter_method"_"$covariate_regression_method"_"$num_pc"_"
-sh merge_outlier_calling_results.sh $tissue_type $total_nodes $tissue_specific_outlier_root $tissue_specific_jxn_file
-
-num_pc="10"
-tissue_specific_jxn_file=$clusters_filter_output_dir$tissue_type"_hg19_filtered_xt_reclustered_gene_mapped.txt"
-tissue_specific_outlier_root=$outlier_calling_dm_output_dir$tissue_type"_"$jxn_filter_method"_"$covariate_regression_method"_"$num_pc"_"
-sh merge_outlier_calling_results.sh $tissue_type $total_nodes $tissue_specific_outlier_root $tissue_specific_jxn_file
-fi

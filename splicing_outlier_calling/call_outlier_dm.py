@@ -533,54 +533,6 @@ def quantile_normalize(count_matrix):
     return np.transpose(new_count_mat)
 
 
-#Convert jxn file into a gene based data structure.
-#Object is a dictionary with keys that are genes. Values are a dictionary with keys 'samples' and 'jxn_matrix'. 
-#Values of jxn_matrix are NxK matrices where N is the number of samples and K is the number of junctions
-##Filtering:
-####1. Limit K to be at max: max_dm_junctions. Implement this filtering by jxn_filter_method
-####2. At the gene level, require an individuals to have at least $min_reads_per_individual.
-########Following up on filter 2, if there are less than $min_individuals_per_gene, discard gene
-def run_pca_gene_level(tissue_specific_jxn_file,max_dm_junctions,jxn_filter_method,min_reads_per_individual,min_individuals_per_gene,tpm_file,rna_seq_samples_file,num_pc,filter_global_outlier_method,v6_sample_attribute_file,outlier_calling_samples_file,sample_attribute_file_tissue_type,node_number):
-    samples_to_use = filter_samples(tissue_specific_jxn_file,filter_global_outlier_method,v6_sample_attribute_file,outlier_calling_samples_file,sample_attribute_file_tissue_type,node_number)
-
-    #Get raw data structure (ie. no filters)
-    gene_jxn_data_structure,all_samples = extract_raw_gene_jxn_data_strucutre(tissue_specific_jxn_file,samples_to_use)
-    #apply max_junction_filter
-    gene_jxn_data_structure = max_number_of_jxns_filter(gene_jxn_data_structure,max_dm_junctions,jxn_filter_method)
-
-    count_matrix = create_expression_matrix(gene_jxn_data_structure,rna_seq_samples_file,tpm_file,all_samples)
-    #np.savetxt('temp.txt',count_matrix,fmt="%s")
-    #count_matrix = np.loadtxt('temp.txt')
-    expr_matrix=quantile_normalize(count_matrix)
-    uu,sig,vv = np.linalg.svd(expr_matrix)
-    scores = uu
-    scores = scores[:,0:num_pc]
-    return scores
-
-
-def run_pca_jxn_level(tissue_specific_jxn_file,max_dm_junctions,jxn_filter_method,min_reads_per_individual,min_individuals_per_gene,tpm_file,rna_seq_samples_file,num_pc):
-    #Get raw data structure (ie. no filters)
-    '''
-    jxn_mat,samples = extract_raw_counts(tissue_specific_jxn_file)
-    per_million_scaling_factor = np.squeeze(np.asarray(np.sum(jxn_mat,axis=0)/1000000.0)) #per_million_scaling_factor
-    K,N = jxn_mat.shape
-    for k in range(K):
-        jxn_mat[k,:] = jxn_mat[k,:]/per_million_scaling_factor #reads per million
-    jxn_mat = np.transpose(jxn_mat)
-    jxn_mat = quantile_normalize(jxn_mat)
-    num_randy = 40000
-    if num_randy > jxn_mat.shape[1]:
-        num_randy = jxn_mat.shape[1] -1
-    rand_vec = np.random.choice(jxn_mat.shape[1],replace=False,size=num_randy)
-    uu,sig,vv = np.linalg.svd(jxn_mat[:,rand_vec])
-    scores = uu
-    scores = scores[:,0:num_pc]
-    '''
-    if num_pc != 5:
-        print('Assumption error')
-    scores = np.loadtxt('/scratch1/battle-fs1/bstrober/rare_variants/rare_splice/outlier_calling/v1/outlier_calling_dm/pca_jxn_mat_5.txt')
-    return scores
-
 
 #Extract mapping from gene to NXK jxn matrix. No filters here
 def extract_raw_counts(tissue_specific_jxn_file):
@@ -641,6 +593,8 @@ def mahalanobis_distance_computer(x,alpha):
     n = np.sum(x)
     alpha_0 = np.sum(alpha)
     cov = compute_dm_covariance_matrix(n,alpha)
+    K = cov.shape[0]
+    cov = cov + np.eye(K)*.1 # padd the covariance matrix
     mu = n*alpha/alpha_0
     diff_mat = np.asmatrix(x-mu)
     p_inv_cov = np.linalg.pinv(cov)
@@ -648,6 +602,12 @@ def mahalanobis_distance_computer(x,alpha):
     error_term = False
     if distance < 0:
         print('ERROR: Mahalanobis distance is less than zero')
+        print('cov:')
+        print(cov)
+        print('x:')
+        print(x)
+        print('alpha:')
+        print(alpha)
         error_term = True
     return np.sqrt(distance), error_term
 
@@ -686,9 +646,11 @@ def adaptive_sample(alpha,N_count,max_observed_distance):
 def sample_glm(alpha, num_samples, N_count, mu, inv_cov):
     distyz = []
     sample_alphas = np.random.dirichlet(alpha,size=num_samples)
+
     x = []
     for i in range(num_samples):
-        x.append(np.random.multinomial(N_count,sample_alphas[i,:]))
+        temp_sample_x = np.random.multinomial(N_count,sample_alphas[i,:])
+        x.append(temp_sample_x)
     x = np.asmatrix(x)
     if num_samples <= 1000:  # If number of samples is 1000 or less, do not split up the matrix
         diff_mat = x-mu
@@ -701,13 +663,15 @@ def sample_glm(alpha, num_samples, N_count, mu, inv_cov):
             diff_mat = x_iter - mu
             distances.append(np.diag(np.dot(np.dot(diff_mat, inv_cov),np.transpose(diff_mat))))
         distances = np.hstack(distances)
-    return distances
+    return np.sqrt(distances)
 
 
-def adaptive_sample_glm(alpha, md):
-    N_count = 20000
+def adaptive_sample_glm(alpha, md, N_count):
+    # N_count = 20000
     alpha_0 = np.sum(alpha)
     cov = compute_dm_covariance_matrix(N_count, alpha)
+    K = cov.shape[0]
+    cov = cov + np.eye(K)*.1 # padd the covariance matrix
     mu = N_count*alpha/alpha_0
     inv_cov = np.linalg.pinv(cov)
 
@@ -716,9 +680,9 @@ def adaptive_sample_glm(alpha, md):
     if max(sample_distances) < md:
         num_samples = 10000
         sample_distances = sample_glm(alpha, num_samples, N_count, mu, inv_cov)
-        if max(sample_distances) < md:
-            num_samples = 100000
-            sample_distances = sample_glm(alpha, num_samples, N_count, mu, inv_cov)
+        #if max(sample_distances) < md:
+        #    num_samples = 100000
+        #    sample_distances = sample_glm(alpha, num_samples, N_count, mu, inv_cov)
     pval = len(np.where(md <= sample_distances)[0])/float(len(sample_distances))
     return pval
 
@@ -791,13 +755,16 @@ def outlier_analysis_dm_glm(X, alpha_matrix):
     error = False
     for n in range(N):  # Loop through the samples
         alpha_n = np.squeeze(np.asarray(alpha_matrix[n,:]))  # alpha for this sample
-        md_n, error_term = mahalanobis_distance_computer(X[n,:],alpha_n)
+        num_reads = int(np.sum(X[n,:]*500))
+        md_n, error_term = mahalanobis_distance_computer(X[n,:]*500, alpha_n)
+
         if error_term == True:
-            return distances, pvalues, True
+            print('mahab error')
+            num = 5.0/0
         distances.append(md_n)
-        pvalue_n = adaptive_sample_glm(alpha_n, md_n)
+        pvalue_n = adaptive_sample_glm(alpha_n, md_n, num_reads)
         pvalues.append(pvalue_n)
-    return distances, pvalues, error 
+    return distances, pvalues 
 
 
 
@@ -897,21 +864,6 @@ def extract_covariates(samples,sample_attribute_file,tissue_type):
 
 #######################################################################################################################################################
 
-def stan_pca_regression(X,scores,all_samples,samples):
-    indi= all_samples
-    N,P = scores.shape
-    if len(indi) != N:
-        print('erororor')
-    cov_mat = []
-    for i,val in enumerate(all_samples):
-        if val in samples:
-            cov_mat.append(np.squeeze(np.asarray(scores[i,:])))
-    cov_mat = np.asmatrix(cov_mat)
-    N1,K1 = X.shape
-    N2,K2 = cov_mat.shape
-    if N1 != N2:
-        print('eororororoor')
-    return dm_glm.regress_covariates_with_dm_glm(X,np.hstack((np.ones((N1,1)),cov_mat)))
 
 #Print outlier calling dm results to output file
 def outlier_calling_print_helper(arr,samples,all_samples,t,gene):
@@ -942,7 +894,7 @@ def outlier_calling_print_helper(arr,samples,all_samples,t,gene):
 
 #call outliers for each gene using a fitted dirichlet multinomial
 #Also write to output
-def call_outliers_with_dirichlet_multinomial(tissue_specific_outlier_file_root,gene_jxn_data_structure,all_samples,start_number,end_number,covariate_regression_method, lam):
+def call_outliers_with_dirichlet_multinomial(tissue_specific_outlier_file_root, gene_jxn_data_structure, all_samples, start_number, end_number, covariate_regression_method):
 
     #Initialize output files
     t_MD = open(tissue_specific_outlier_file_root + '_md.txt','w')#file handle for matrix of mahalnobis distances
@@ -955,15 +907,18 @@ def call_outliers_with_dirichlet_multinomial(tissue_specific_outlier_file_root,g
 
     start_time = time.time()
 
-    for counter,gene in enumerate(gene_jxn_data_structure.keys()):
+    for counter,gene in enumerate(sorted(gene_jxn_data_structure.keys())):
         #Parrallelization Stuff
         if counter < start_number or counter > end_number:
             continue
+        print('$$$$$$$$$$$$$$$$$$$$$$$$$$')
+        print(counter)
+        print('$$$$$$$$$$$$$$$$$$$$$$$$$$')
         ####################################################################
         #time related stuff
         ####################################################################
         curr_time = time.time()
-        diff = curr_time-start_time
+        diff = curr_time - start_time
         start_time = curr_time
         time_min = diff/60.0
         print(time_min)
@@ -972,75 +927,71 @@ def call_outliers_with_dirichlet_multinomial(tissue_specific_outlier_file_root,g
         ####################################################################
         #Actual analysis
         ####################################################################
-        try:
-            #Extract jxn matrix for gene
-            X = gene_jxn_data_structure[gene]['jxn_matrix']
-            #Extract genes samples
-            samples = gene_jxn_data_structure[gene]['samples']
-            #Exctract covariance matrix
-            if covariate_regression_method.startswith('junction_pc_no_regress') == False:
-                if covariate_regression_method != 'none':
-                    cov_mat = gene_jxn_data_structure[gene]['covariate_matrix']
+        #Extract jxn matrix for gene
+        X = gene_jxn_data_structure[gene]['jxn_matrix']
+        #Extract genes samples
+        samples = gene_jxn_data_structure[gene]['samples']
 
-                    N1,K = cov_mat.shape
-                    N2,J = X.shape
-                    #simple error checking
+
+
+        working = True
+        iteration = 1
+        while working:
+            try:
+
+                if covariate_regression_method == 'none':
+                    #Run outlier analysis
+                    N1, J = X.shape
+                    # Covariance matrix is just intercept
+                    cov_mat = np.ones((N1, 1))
+
+                elif covariate_regression_method == 'junction_pc_no_regress_reg':
+                    cov_mat_no_intercept = gene_jxn_data_structure[gene]['covariate_matrix']
+                    N1, K = cov_mat_no_intercept.shape
+                    N2, J = X.shape
                     if N1 != N2:
-                        print('erororoororor')
+                        print('ASSUMPTION ERROROR')
+                    cov_mat = np.hstack((np.ones((N1, 1)), cov_mat_no_intercept))
+                elif covariate_regression_method == 'junction_pc_only_no_regress_reg':
+                    cov_mat_no_intercept = gene_jxn_data_structure[gene]['covariate_matrix']
+                    N1, K = cov_mat_no_intercept.shape
+                    N2, J = X.shape
+                    if N1 != N2:
+                        print('ASSUMPTION ERROROR')
+                    cov_mat_no_intercept = cov_mat_no_intercept[:,(-cov_mat_no_intercept.shape[1]):-4]
+                    cov_mat = np.hstack((np.ones((N1, 1)), cov_mat_no_intercept))
 
-                    #Regress out effects of covariates
-                    X = dm_glm.regress_covariates_with_dm_glm(X,np.hstack((np.ones((N1,1)),cov_mat)))
+                alpha_matrix, beta_mat, conc_vec = dm_glm.dirichlet_multinomial_glm_fit(X, cov_mat)
+                distances, pvalz = outlier_analysis_dm_glm(X, alpha_matrix)
+                working = False
+                converged = True
+            except:
+                print('iteration ' + str(iteration))
+                iteration = iteration + 1
+                if iteration > 20:
+                    working = False
+                    converged = False
+                    print('convergence error for ' + str(counter))
 
-                #Run outlier analysis
-                distances,pvalz,alpha = outlier_analysis_dm(X,samples)
-            elif covariate_regression_method.startswith('junction_pc_no_regress'):
-                cov_mat = gene_jxn_data_structure[gene]['covariate_matrix']
-                N1,K = cov_mat.shape
-                N2,J = X.shape
-                alpha_matrix, beta_mat, conc_vec = dm_glm.dirichlet_multinomial_glm_fit(X,np.hstack((np.ones((N1,1)),cov_mat)), lam)
-                distances, pvalz, error = outlier_analysis_dm_glm(X, alpha_matrix)
-            if error == False:
-                #print Mahalanobis distance results to output file
-                t_MD = outlier_calling_print_helper(distances,samples,all_samples,t_MD,gene)
-                #print emperical pvalu results to output file
-                t_pvalue = outlier_calling_print_helper(pvalz,samples,all_samples,t_pvalue,gene)
-            else:
-                print('ERROR in running ' + gene)
-
-        except:
-            print('ERROR in running ' + gene)
+        if converged == True:
+            #print Mahalanobis distance results to output file
+            t_MD = outlier_calling_print_helper(distances, samples, all_samples, t_MD, gene)
+            #print emperical pvalu results to output file
+            t_pvalue = outlier_calling_print_helper(pvalz, samples, all_samples, t_pvalue, gene)
 
 
 
 
-
-def remove_weird_samples(X,samples,num_remove,file_name):
-    indi_to_remove = {}
-    f = open(file_name)
-    for i,line in enumerate(f):
-        if i > 49:
-            continue
-        line = line.rstrip()
-        data = line.split()
-        indi_to_remove[data[0]] = 1
-    new_samples = []
-    good_rows = []
-    for i,sample in enumerate(samples):
-        if sample in indi_to_remove:
-            continue
-        new_samples.append(sample)
-        good_rows.append(i)
-    new_X = X[good_rows,:]
-    return new_X,np.asarray(new_samples)
 def parallelization_start_and_end(total,node_number,total_nodes):
     genes_per_node = (total/total_nodes) +1
     gene_start = node_number*genes_per_node
     gene_end = (node_number + 1)*genes_per_node -1
     return gene_start,gene_end
 
-def call_outliers(tissue_type, tissue_specific_jxn_file, tissue_specific_outlier_file, outlier_calling_dm_output_dir, max_dm_junctions, jxn_filter_method, node_number, total_nodes, covariate_regression_method, covariate_file, rna_seq_samples_file, num_pc, outlier_calling_samples_file, lam):
-    min_reads_per_individual= 5
-    min_individuals_per_gene=50
+
+def call_outliers(tissue_type, tissue_specific_jxn_file, tissue_specific_outlier_file, outlier_calling_dm_output_dir, max_dm_junctions, jxn_filter_method, node_number, total_nodes, covariate_regression_method, covariate_file, rna_seq_samples_file, num_pc, outlier_calling_samples_file):
+    min_reads_per_individual = 5
+    min_individuals_per_gene = 50
     #Convert jxn file into a gene based data structure.
     #Object is a dictionary with keys that are genes. Values are NxK matrices where N is the number of samples and K is the number of junctions
     ##Filtering:
@@ -1048,32 +999,13 @@ def call_outliers(tissue_type, tissue_specific_jxn_file, tissue_specific_outlier
     ####2. At the gene level, require an individuals to have at least $min_reads_per_individual.
     ########Following up on filter 2, if there are less than $min_individuals_per_gene, discard gene
     gene_jxn_data_structure, all_samples = create_gene_based_data_structure(tissue_specific_jxn_file, max_dm_junctions, jxn_filter_method, min_reads_per_individual, min_individuals_per_gene, outlier_calling_samples_file, covariate_file, covariate_regression_method, node_number)
-    
 
-
-    #Run PCA on normalized gene level count data
-    #pca_scores = run_pca_gene_level(tissue_specific_jxn_file,max_dm_junctions,jxn_filter_method,min_reads_per_individual,min_individuals_per_gene,read_counts_tpm_file,rna_seq_samples_file,num_pc,filter_global_outlier_method,v6_sample_attribute_file,outlier_calling_samples_file,sample_attribute_file_tissue_type,node_number)
-
-    #pca_jxn_scores = run_pca_jxn_level(tissue_specific_jxn_file,max_dm_junctions,jxn_filter_method,min_reads_per_individual,min_individuals_per_gene,read_counts_tpm_file,rna_seq_samples_file,num_pc)
-    
     #For parallelization purposes 
     start_number,end_number = parallelization_start_and_end(len(gene_jxn_data_structure),node_number,total_nodes)
     #call outliers for each gene using a fitted dirichlet multinomial
     #Also write to output
-    call_outliers_with_dirichlet_multinomial(tissue_specific_outlier_file,gene_jxn_data_structure,all_samples,start_number,end_number, covariate_regression_method, lam)
+    call_outliers_with_dirichlet_multinomial(tissue_specific_outlier_file,gene_jxn_data_structure,all_samples,start_number,end_number, covariate_regression_method)
 
-#tissue types in sample attribute file are spelled differently than 'traditional'. This provides a conversion between the two
-def get_sample_attribute_tissue_type(tissue_list_input_file,tissue_type):
-    f = open(tissue_list_input_file)
-    for line in f:
-        line = line.rstrip()
-        data = line.split('\t')
-        if data[0] == tissue_type:
-            return data[1]
-    f.close()
-    print('Error: no matched tissue type')
-    pdb.set_trace()
-    return
 
 
 tissue_type = sys.argv[1]
@@ -1106,7 +1038,6 @@ num_pc = int(sys.argv[12])
 #output file to write actual samples used in this analysis
 outlier_calling_samples_file = sys.argv[13]
 
-lam = float(sys.argv[14])
 
 
-call_outliers(tissue_type, tissue_specific_jxn_file, tissue_specific_outlier_file, outlier_calling_dm_output_dir, max_dm_junctions, jxn_filter_method, node_number, total_nodes, covariate_regression_method, covariate_file, rna_seq_samples_file, num_pc, outlier_calling_samples_file, lam)
+call_outliers(tissue_type, tissue_specific_jxn_file, tissue_specific_outlier_file, outlier_calling_dm_output_dir, max_dm_junctions, jxn_filter_method, node_number, total_nodes, covariate_regression_method, covariate_file, rna_seq_samples_file, num_pc, outlier_calling_samples_file)

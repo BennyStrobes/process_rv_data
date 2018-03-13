@@ -71,5 +71,7 @@ tissue_specific_jxn_file=sys.argv[4]
 
 cluster_to_gene_mapping = get_cluster_to_gene_mapping(tissue_specific_jxn_file)
 
-merge_output_files(total_nodes,tissue_specific_outlier_root,'_parametric_pvalue.txt',cluster_to_gene_mapping)
 merge_output_files(total_nodes,tissue_specific_outlier_root,'_emperical_pvalue.txt',cluster_to_gene_mapping)
+
+
+#merge_output_files(total_nodes,tissue_specific_outlier_root,'_parametric_pvalue.txt',cluster_to_gene_mapping)
